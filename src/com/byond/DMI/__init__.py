@@ -144,10 +144,10 @@ class DMI:
 
         # copy metadata into new object
         
-        reserved = ('interlace', 'gamma', 'dpi', 'transparency', 'aspect')
+        reserved = ('interlace', 'gamma', 'dpi', 'transparency', 'aspect','icc_profile')
         for k, v in img.info.items():
                 if k in reserved: continue
-                print(k, v)
+                print(k,v)
                 meta.add_text(k, v, 1)
         # Only need one - Rob
         meta.add_text(b'Description', newHeader.encode('ascii'), 1)
