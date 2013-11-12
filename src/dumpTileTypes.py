@@ -1,7 +1,4 @@
-import os, sys, re
-from com.byond.objtree import *
-import com.byond.map as byond_map
-from com.byond import GetFilesFromDME
+
 """
 Usage:
     $ python dumpTileTypes.py path/to/your.dme path/to/yourmap.dmm
@@ -29,14 +26,16 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 """
+import os, sys
+from com.byond.objtree import ObjectTree
+from com.byond.map import Tile, Map
 
 if os.path.isfile(sys.argv[1]):
     selectedDMEs = []
     tree = ObjectTree()
     tree.ProcessFilesFromDME(sys.argv[1])
-    tree.
-    dmm = byond_map.Map(tree)
+    dmm = Map(tree)
     dmm.readMap(sys.argv[2])
     with open(sys.argv[2]+'.opt','w') as f:
         for tile in dmm.tileTypes:
-            f.write(tile.__str__(True)+'\n')
+            f.write(tile.MapSerialize(Tile.FLAG_INHERITED_PROPERTIES|Tile.FLAG_USE_OLD_ID))

@@ -135,3 +135,15 @@ class Atom:
         if name not in self.properties:
             return o + 'None'
         return o + repr(self.properties[name])
+
+
+class Proc(Atom):
+    def __init__(self, path, arguments, filename='', line=0):
+        Atom.__init__(self, path, filename, line)
+        self.arguments=arguments
+        
+    def MapSerialize(self,flags=0):
+        return None
+    
+    def InheritProperties(self):
+        return

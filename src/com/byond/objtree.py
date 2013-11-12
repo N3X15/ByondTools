@@ -19,7 +19,7 @@ class ObjectTree:
     reserved_words = ('else', 'break', 'return', 'continue', 'spawn', 'proc')
     def __init__(self):
         self.Atoms = {}
-        self.Tree = {}
+        self.Tree = Atom('')
         self.cpath = []
         self.popLevels = []
         self.InProc = []
@@ -47,7 +47,7 @@ class ObjectTree:
         inProc = False
         for chunk in string.split('/'):
             if not inProc: 
-                if '(' in chunk:
+                if '(' in chunk and ')' not in chunk:
                     inProc = True
                     buf += [chunk]
                 else:
@@ -95,7 +95,7 @@ class ObjectTree:
                                 filename += c
         self.MakeTree()
                     
-    def ProcessAtom(self, filename, ln, line, atom, atom_path, numtabs):
+    def ProcessAtom(self, filename, ln, line, atom, atom_path, numtabs, procArgs=None):
         # Reserved words that show up on their own
         if atom in ObjectTree.reserved_words:
             return
@@ -148,8 +148,13 @@ class ObjectTree:
             
         npath = '/'.join(self.cpath)
         if npath not in self.Atoms:
-            self.Atoms[npath] = Atom(npath, filename, ln)
-            if self.debugOn: print('Added ' + npath)
+            if procArgs is not None:
+                #print(npath)
+                assert npath.endswith(')')
+                self.Atoms[npath] = Proc(npath, procArgs, filename, ln)
+            else:
+                self.Atoms[npath] = Atom(npath, filename, ln)
+            #if self.debugOn: print('Added ' + npath)
         self.pindent = numtabs
     
     def ProcessFile(self, filename):
@@ -252,10 +257,10 @@ class ObjectTree:
                     numtabs = len(m.group('tabs'))
                     atom = '{0}/{1}({2})'.format(m.group('atom'), m.group("proc"), m.group('args')) 
                     atom_path = self.SplitPath(atom)
-                    self.ProcessAtom(filename, ln, line, atom, atom_path, numtabs)
+                    #print('PROCESSING ABS PROC AT INDENT > ' + str(numtabs) + " " + atom+" -> "+repr(atom_path))
+                    self.ProcessAtom(filename, ln, line, atom, atom_path, numtabs, m.group('args').split(','))
                     self.ignoreStartIndent = numtabs
                     self.ignoringProc = atom
-                    if self.debugOn: print('IGNORING PROC AT INDENT > ' + str(numtabs) + " " + line)
                     continue
                 
                 m = REGEX_RELATIVE_PROCDEF.match(line)
@@ -263,10 +268,10 @@ class ObjectTree:
                     numtabs = len(m.group('tabs'))
                     atom = '{}({})'.format(m.group("proc"), m.group('args')) 
                     atom_path = self.SplitPath(atom)
-                    self.ProcessAtom(filename, ln, line, atom, atom_path, numtabs)
+                    #print('IGNORING RELATIVE PROC AT INDENT > ' + str(numtabs) + " " + line)
+                    self.ProcessAtom(filename, ln, line, atom, atom_path, numtabs, m.group('args').split(','))
                     self.ignoreStartIndent = numtabs
                     self.ignoringProc = atom
-                    if self.debugOn: print('IGNORING PROC AT INDENT > ' + str(numtabs) + " " + line)
                     continue
                 
                 path = '/'.join(self.cpath)
@@ -279,7 +284,8 @@ class ObjectTree:
                     name = m.group('variable')
                     content = m.group('content')
                     qmark = m.group('qmark')
-                    if self.debugOn: print('var/{0} = {1}{2}{1}'.format(name, qmark, content))
+                    #if self.debugOn: 
+                    if name=='name': print('{3}: var/{0} = {1}{2}{1}'.format(name, qmark, content,path))
                     if qmark == '"':
                         self.Atoms[path].properties[name] = BYONDString(content, filename, ln)
                     else:
@@ -290,11 +296,11 @@ class ObjectTree:
                         self.Atoms[path] = Atom(path)
                     name = m.group('variable')
                     content = m.group('content')
-                    if self.debugOn: print('var/{0} = {1}{2}{1}'.format(name, qmark, content))
+                    if self.debugOn: print('var/{0} = {1}'.format(name, content))
                     if '.' in content:
                         self.Atoms[path].properties[name] = BYONDValue(float(content), filename, ln)
                     else:
-                        self.Atoms[path].properties[name] = BYONDFileRef(int(content), filename, ln)
+                        self.Atoms[path].properties[name] = BYONDValue(int(content), filename, ln)
     def MakeTree(self):
         print('Generating Tree...')
         self.Tree = Atom('/')
@@ -304,7 +310,7 @@ class ObjectTree:
                 atom = self.Atoms[key]
                 cpath = []
                 cNode = self.Tree
-                fullpath = atom.path.split('/')
+                fullpath = self.SplitPath(atom.path)
                 truncatedPath = fullpath[1:]
                 for path_item in truncatedPath:
                     cpath += [path_item]
@@ -316,7 +322,10 @@ class ObjectTree:
                         if cpath_str in self.Atoms:
                             cNode.children[path_item] = self.Atoms[cpath_str]
                         else:
-                            cNode.children[path_item] = Atom('/'.join([''] + cpath))
+                            if '(' in path_item:
+                                cNode.children[path_item] = Proc('/'.join([''] + cpath),[])
+                            else:
+                                cNode.children[path_item] = Atom('/'.join([''] + cpath))
                         cNode.children[path_item].parent = cNode
                     cNode = cNode.children[path_item]
         self.Tree.InheritProperties()

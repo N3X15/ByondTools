@@ -1,7 +1,7 @@
 import os, itertools, sys
 from com.byond.DMI import DMI
-from com.byond.directions import *
-from com.byond.basetypes import *
+from com.byond.directions import NORTH, IMAGE_INDICES
+from com.byond.basetypes import Atom, BYONDString, BYONDValue, BYONDFileRef
 from PIL import Image, PngImagePlugin
 
 ID_ENCODING_TABLE = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -165,17 +165,6 @@ class Map:
                 x = 0
                 for chunk in chunker(line.strip(), self.idlen):
                     chunk = ''.join(chunk)
-                    '''
-                    if chunk == '"}':
-                        inZLevel = False
-                        if height == 0:
-                            height = y
-                        # self.zLevels[z] = MapLayer(self, height, width)
-                        # self.zLevels[z].tiles = zLevel
-                        self.zLevels[z] = zLevel
-                        print('Added map layer {0} ({1}x{2})'.format(z, height, width))
-                        continue
-                    '''
                     tid = self.oldID2NewID[chunk]
                     # print('{0} => {1}'.format(chunk,tid))
                     zLevel.SetTileAt(x, y, self.tileTypes[tid])
@@ -189,21 +178,29 @@ class Map:
         for tid in xrange(len(self.tileTypes)):
             self.tileTypes[tid].frame = Image.new('RGBA', (32, 32))
             for atom in sorted(self.tileTypes[tid].data,reverse=True):
+                
                 if atom.path == '/turf/space':
                     # We're going to turn space black for smaller images.
                     atom.properties['icon_state'].value='black'
+                    
                 if 'icon' not in atom.properties:
                     continue
                 dmi_file = atom.properties['icon'].value
+                
                 if 'icon_state' not in atom.properties:
-                    atom.properties['icon_state']=BYONDString("") #Default icon_state
+                    #Grab default icon_state ('') if we can't find the one defined.
+                    atom.properties['icon_state']=BYONDString("")
+                
                 state = atom.properties['icon_state'].value
+                
+                
                 direction = 1
                 if 'dir' in atom.properties:
                     try:
                         direction = int(atom.properties['dir'].value)
                     except ValueError:
                         direction = NORTH
+                
                 icon_key = '{0}:{1}[{2}]'.format(dmi_file, state, direction)
                 if icon_key not in icons:
                     dmi = None
