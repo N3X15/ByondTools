@@ -5,7 +5,8 @@ import re, logging, os
 from .basetypes import *
 
 REGEX_TABS = re.compile('^(?P<tabs>\t*)')  # \s*$
-REGEX_VARIABLE = re.compile('^(?P<tabs>\t+)(?:var/)?(?P<type>[a-zA-Z0-9_]*/)?(?P<variable>[a-zA-Z0-9_]+)\s*=\s*(?P<qmark>[\'"])(?P<content>.+)(?P=qmark)\s*(?P<comment>//.*)?$')  # \s*$
+REGEX_VARIABLE_STRING = re.compile('^(?P<tabs>\t+)(?:var/)?(?P<type>[a-zA-Z0-9_]*/)?(?P<variable>[a-zA-Z0-9_]+)\s*=\s*(?P<qmark>[\'"])(?P<content>.+)(?P=qmark)\s*$')
+REGEX_VARIABLE_NUMBER = re.compile('^(?P<tabs>\t+)(?:var/)?(?P<type>[a-zA-Z0-9_]*/)?(?P<variable>[a-zA-Z0-9_]+)\s*=\s*(?P<content>[0-9\.]+)\s*$')
 REGEX_ATOMDEF = re.compile('^(?P<tabs>\t*)(?P<atom>[a-zA-Z0-9_/]+)\\{?\\s*$')
 REGEX_ABSOLUTE_PROCDEF = re.compile('^(?P<tabs>\t*)(?P<atom>[a-zA-Z0-9_/]+)/(?P<proc>[a-zA-Z0-9_]+)\((?P<args>.*)\)\\{?\s*$')
 REGEX_RELATIVE_PROCDEF = re.compile('^(?P<tabs>\t*)(?P<proc>[a-zA-Z0-9_]+)\((?P<args>.*)\)\\{?\\s*$')
@@ -271,7 +272,7 @@ class ObjectTree:
                 path = '/'.join(self.cpath)
                 if len(self.cpath) > 0 and 'proc' in self.cpath:
                     continue
-                m = REGEX_VARIABLE.match(line)
+                m = REGEX_VARIABLE_STRING.match(line)
                 if m is not None:
                     if path not in self.Atoms:
                         self.Atoms[path] = Atom(path)
@@ -283,6 +284,17 @@ class ObjectTree:
                         self.Atoms[path].properties[name] = BYONDString(content, filename, ln)
                     else:
                         self.Atoms[path].properties[name] = BYONDFileRef(content, filename, ln)
+                m = REGEX_VARIABLE_NUMBER.match(line)
+                if m is not None:
+                    if path not in self.Atoms:
+                        self.Atoms[path] = Atom(path)
+                    name = m.group('variable')
+                    content = m.group('content')
+                    if self.debugOn: print('var/{0} = {1}{2}{1}'.format(name, qmark, content))
+                    if '.' in content:
+                        self.Atoms[path].properties[name] = BYONDValue(float(content), filename, ln)
+                    else:
+                        self.Atoms[path].properties[name] = BYONDFileRef(int(content), filename, ln)
     def MakeTree(self):
         print('Generating Tree...')
         self.Tree = Atom('/')
