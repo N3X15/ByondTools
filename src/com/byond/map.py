@@ -179,6 +179,10 @@ class Map:
             self.tileTypes[tid].frame = Image.new('RGBA', (32, 32))
             for atom in sorted(self.tileTypes[tid].data,reverse=True):
                 
+                # Ignore /areas.  They look like ass.
+                if atom.path.startswith('/area'):
+                    continue
+                
                 if atom.path == '/turf/space':
                     # We're going to turn space black for smaller images.
                     atom.properties['icon_state'].value='black'
