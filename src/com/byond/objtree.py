@@ -17,7 +17,12 @@ def debug(filename, line, path, message):
 
 class ObjectTree:
     reserved_words = ('else', 'break', 'return', 'continue', 'spawn', 'proc')
+    stdlib_files=(
+        'dm_std.dm',
+        'atom_defaults.dm'
+    )
     def __init__(self):
+        self.LoadedStdLib=False
         self.Atoms = {}
         self.Tree = Atom('')
         self.cpath = []
@@ -32,6 +37,8 @@ class ObjectTree:
             '/*':'*/',
             '{"':'"}'
         }
+        self.defines={}
+        self.defineMatchers={}
         
         nit = self.ignoreTokens.copy()
         for start, stop in self.ignoreTokens.iteritems():
@@ -61,6 +68,12 @@ class ObjectTree:
         return o
         
     def ProcessFilesFromDME(self, dmefile='baystation12.dme', ext='.dm'):
+        if not self.LoadedStdLib:
+            stdlib_dir=os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+            stdlib_dir=os.path.join(stdlib_dir,'stdlib')
+            for filename in self.stdlib_files:
+                self.ProcessFile(os.path.join(stdlib_dir,filename))
+                
         print('--- Parsing DM files...')
         numFilesTotal = 0
         rootdir = os.path.dirname(dmefile)
@@ -229,6 +242,39 @@ class ObjectTree:
                 if line.strip() == '':
                     continue
                 
+                if line.startswith("#"):
+                    if line.endswith('\\'): continue
+                    if line.startswith('#define'):
+                        # #define SOMETHING Value
+                        defineChunks = line.split(None,3)
+                        if len(defineChunks)==2:
+                            defineChunks+=[1]
+                        #print(repr(defineChunks))
+                        try:
+                            if '.' in defineChunks[2]:
+                                self.defines[defineChunks[1]]=BYONDValue(float(defineChunks[2]),filename,ln)
+                            else:
+                                self.defines[defineChunks[1]]=BYONDValue(int(defineChunks[2]),filename,ln)
+                        except:
+                            self.defines[defineChunks[1]]=BYONDString(defineChunks[2],filename,ln)
+                    elif line.startswith('#undef'):
+                        undefChunks = line.split(' ',2)
+                        if undefChunks[1] in self.defines:
+                            del self.defines[undefChunks[1]]
+                    else:
+                        chunks=line.split(' ')
+                        print('BUG: Unhandled preprocessor directive {} in {}:{}'.format(chunks[0],filename,ln))
+                    continue
+                else:
+                    for key,define in self.defines.items():
+                        if key in line:
+                            if key not in self.defineMatchers:
+                                self.defineMatchers[key]=re.compile(r'\b'+key+r'\b')
+                            newline=self.defineMatchers[key].sub(str(define.value),line)
+                            #print('OLD: {}'.format(line))
+                            #print('PPD: {}'.format(newline))
+                            line=newline
+                
                 m = REGEX_TABS.match(line)
                 if m is not None:
                     numtabs = len(m.group('tabs'))
@@ -284,8 +330,7 @@ class ObjectTree:
                     name = m.group('variable')
                     content = m.group('content')
                     qmark = m.group('qmark')
-                    #if self.debugOn: 
-                    if name=='name': print('{3}: var/{0} = {1}{2}{1}'.format(name, qmark, content,path))
+                    if self.debugOn: print('{3}: var/{0} = {1}{2}{1}'.format(name, qmark, content,path))
                     if qmark == '"':
                         self.Atoms[path].properties[name] = BYONDString(content, filename, ln)
                     else:

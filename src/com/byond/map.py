@@ -44,6 +44,65 @@ class Tile:
         if pad > len(o):
             o = o.rjust(pad, ID_ENCODING_TABLE[0])
         return o
+    
+    def renderTile(self):
+        frame = Image.new('RGBA', (32, 32))
+        for atom in sorted(self.data,reverse=True):
+            
+            # Ignore /areas.  They look like ass.
+            if atom.path.startswith('/area'):
+                continue
+            
+            if atom.path == '/turf/space':
+                # We're going to turn space black for smaller images.
+                atom.properties['icon_state'].value='black'
+                
+            if 'icon' not in atom.properties:
+                continue
+            dmi_file = atom.properties['icon'].value
+            
+            if 'icon_state' not in atom.properties:
+                #Grab default icon_state ('') if we can't find the one defined.
+                atom.properties['icon_state']=BYONDString("")
+            
+            state = atom.properties['icon_state'].value
+            
+            
+            direction = NORTH
+            if 'dir' in atom.properties:
+                try:
+                    direction = int(atom.properties['dir'].value)
+                except ValueError:
+                    print('FAILED TO READ dir = '+repr(atom.properties['dir'].value))
+                    pass
+            
+            icon_key = '{0}:{1}[{2}]'.format(dmi_file, state, direction)
+            if icon_key not in icons:
+                dmi = None
+                try:
+                    dmi = self.loadDMI(os.path.join(basedir, dmi_file))
+                except Exception:
+                    for prop in ['icon', 'icon_state', 'dir']:
+                        print('\t{0}'.format(atom.dumpPropInfo(prop)))
+                    pass
+                if direction not in IMAGE_INDICES:
+                    direction = NORTH
+                frame = dmi.getFrame(state, direction, 0)
+                if frame == None:
+                    # Get the error/default state.
+                    frame = dmi.getFrame("", direction, 0)
+                    # varState=atom.properties['icon_state']
+                    # varDir=None
+                    # if 'dir' in atom.properties:
+                    #    varDir=atom.properties['dir']
+                    # print('state:{} dir:{} == None'.format(state, direction))
+                    # print('icon_state in {}:{}'.format(varState.filename,varState.line))
+                
+                if frame == None:
+                    continue
+                # print(repr(frame))
+                frame = frame.convert("RGBA")
+                self.tileTypes[tid].frame.paste(frame, (0, 0), frame)  # Add to the top of the stack.
     def __str__(self):
         return self.MapSerialize(Tile.FLAG_USE_OLD_ID)
         
@@ -198,12 +257,13 @@ class Map:
                 state = atom.properties['icon_state'].value
                 
                 
-                direction = 1
+                direction = NORTH
                 if 'dir' in atom.properties:
                     try:
                         direction = int(atom.properties['dir'].value)
                     except ValueError:
-                        direction = NORTH
+                        print('FAILED TO READ dir = '+repr(atom.properties['dir'].value))
+                        continue
                 
                 icon_key = '{0}:{1}[{2}]'.format(dmi_file, state, direction)
                 if icon_key not in icons:
