@@ -1,6 +1,6 @@
 import os, itertools, sys
 from com.byond.DMI import DMI
-from com.byond.directions import NORTH, IMAGE_INDICES
+from com.byond.directions import NORTH, SOUTH, IMAGE_INDICES
 from com.byond.basetypes import Atom, BYONDString, BYONDValue, BYONDFileRef
 from PIL import Image, PngImagePlugin
 
@@ -235,7 +235,8 @@ class Map:
         icons = {}
         print('--- Generating texture atlas...')
         for tid in xrange(len(self.tileTypes)):
-            self.tileTypes[tid].frame = Image.new('RGBA', (32, 32))
+            self.tileTypes[tid].frame = Image.new('RGBA', (96, 96))
+            self.tileTypes[tid].offset=(32,32)
             for atom in sorted(self.tileTypes[tid].data,reverse=True):
                 
                 # Ignore /areas.  They look like ass.
@@ -248,6 +249,7 @@ class Map:
                     
                 if 'icon' not in atom.properties:
                     continue
+                
                 dmi_file = atom.properties['icon'].value
                 
                 if 'icon_state' not in atom.properties:
@@ -256,8 +258,7 @@ class Map:
                 
                 state = atom.properties['icon_state'].value
                 
-                
-                direction = NORTH
+                direction = SOUTH
                 if 'dir' in atom.properties:
                     try:
                         direction = int(atom.properties['dir'].value)
@@ -274,8 +275,19 @@ class Map:
                         for prop in ['icon', 'icon_state', 'dir']:
                             print('\t{0}'.format(atom.dumpPropInfo(prop)))
                         pass
+                    
+                    if dmi.img.mode not in ('RGBA','P'):
+                        print('WARNING: {} is mode {}!'.format(dmi_file,dmi.img.mode))
+                        
                     if direction not in IMAGE_INDICES:
-                        direction = NORTH
+                        print('WARNING: Unrecognized direction {} on atom {} in tile {}!'.format(direction,atom.MapSerialize(),self.tileTypes[tid].origID))
+                        #tile=Tile()
+                        #tile=self.tileTypes[tid]
+                        #print(tile.MapSerialize())
+                        #print(atom.MapSerialize(Atom.FLAG_INHERITED_PROPERTIES))
+                        #return
+                        direction = SOUTH # DreamMaker property editor shows dir = 2.  WTF?
+                        
                     frame = dmi.getFrame(state, direction, 0)
                     if frame == None:
                         # Get the error/default state.
@@ -291,19 +303,25 @@ class Map:
                         continue
                     # print(repr(frame))
                     frame = frame.convert("RGBA")
-                    self.tileTypes[tid].frame.paste(frame, (0, 0), frame)  # Add to the top of the stack.
+                    pixel_x=0
+                    if 'pixel_x' in atom.properties:
+                        pixel_x=int(atom.properties['pixel_x'].value)
+                    pixel_y=0
+                    if 'pixel_y' in atom.properties:
+                        pixel_y=int(atom.properties['pixel_y'].value)
+                    self.tileTypes[tid].frame.paste(frame, (32+pixel_x, 32+pixel_y), frame)  # Add to the top of the stack.
         print('--- Creating maps...')
         for z in self.zLevels.keys():
             filename = filename_tpl.replace('{z}', str(z))
-            print(' -> {} ({}x{})'.format(filename, self.zLevels[z].height * 32, self.zLevels[z].width * 32))
-            zpic = Image.new('RGBA', (self.zLevels[z].width * 32, self.zLevels[z].height * 32), "black")
+            print(' -> {} ({}x{})'.format(filename, (self.zLevels[z].height+2) * 32, (self.zLevels[z].width+2) * 32))
+            zpic = Image.new('RGBA', ((self.zLevels[z].width+2) * 32, (self.zLevels[z].height+2) * 32), "black")
             for y in xrange(self.zLevels[z].height):
                 for x in xrange(self.zLevels[z].width):
                     tile = self.zLevels[z].GetTileAt(x, y)
                     if tile is not None:
                         x_o = 0
                         y_o = 32 - tile.frame.size[1]  # BYOND uses LOWER left as origin for some fucking reason
-                        zpic.paste(tile.frame, ((x * 32) + x_o, (y * 32) + y_o, (x * 32) + 32 + x_o, (y * 32) + 32 + y_o), tile.frame)
+                        zpic.paste(tile.frame, ((x * 32) + x_o + tile.offset[0], (y * 32) + y_o + tile.offset[1], (x * 32) + tile.frame.size[0] + x_o+tile.offset[0], (y * 32) + tile.frame.size[0] + y_o+tile.offset[1]), tile.frame)
             zpic.save(filename, 'PNG')
         
             

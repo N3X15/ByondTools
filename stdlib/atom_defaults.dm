@@ -13,7 +13,7 @@
 	var/list/contents=list() //List of contents. Closets store their contents in this var as do all storage items. All the items on a turf are in the turf's contents var.
 	var/density=0 //If density is at 0, you can walk over the object, if it's set to 1, you can't.
 	var/desc="" //Description. When you right-click and examine an object, this will show under the name.
-	var/dir=1 //Object direction. Sprites have a direction variable which can have 8 'legal' states. More info
+	var/dir=2 //Object direction. Sprites have a direction variable which can have 8 'legal' states. More info
 	var/gender="neutral" //not used
 	//var/icon //The dmi file where the sprite is saved. Must be written in single quotations (Example: 'items.dmi')
 	//var/icon_state //The name of the sprite in the dmi file. If it's not a valid name or is left blank, the sprite without a name in the dmi file will be used. If such a sprite doesn't exist it will default to being blank.

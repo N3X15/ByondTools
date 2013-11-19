@@ -4,7 +4,7 @@ import com.byond.map as byond_map
 from com.byond import GetFilesFromDME
 """
 Usage:
-    $ python calculateMaxTechLevels.py path/to/your.dme .dm
+    $ python generateMap.py path/to/your/project.dme path/to/your/map.dmm
 
 calculateMaxTechLevels.py - Get techlevels of all objects and generate reports. 
 
@@ -38,6 +38,7 @@ if os.path.isfile(sys.argv[1]):
     dmm = byond_map.Map(tree)
     dmm.readMap(sys.argv[2])
     dmm.generateImage(sys.argv[2]+'.{z}.png',os.path.dirname(sys.argv[1]))
-    with open(sys.argv[2]+'.opt','w') as f:
+    
+    with open(sys.argv[2]+'.types','w') as f:
         for tile in dmm.tileTypes:
             f.write(tile.MapSerialize(byond_map.Tile.FLAG_INHERITED_PROPERTIES|byond_map.Tile.FLAG_USE_OLD_ID)+'\n')
