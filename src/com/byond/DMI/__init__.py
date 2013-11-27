@@ -120,8 +120,13 @@ class DMI:
         return ''
     
     def extractTo(self, dest, suppress_post_process=False):
+        flags=0
+        if(suppress_post_process):
+            flags |= DMILoadFlags.NoPostProcessing
+        print('>>> Loading %s...' % self.filename)
+        self.loadAll(flags)
         print('>>> Extracting %s...' % self.filename)
-        self.read(dest, suppress_post_process)
+        self.extractAllStates(dest, flags)
     
     def getFrame(self, state, dir, frame):
         if state not in self.states:
@@ -227,11 +232,10 @@ state = "void2"
                         elif(self.max_x == -1 or self.max_y == -1):
                             self.max_x = self.img.size[0] / self.iw
                             self.max_y = self.img.size[1] / self.iw
-                        for i in range(state.numIcons()):
-                            icon = (x, y)
-                            if (flags & DMILoadFlags.NoImages) == 0:
-                                icon = self.loadIconAt(x, y)
-                            state.icons += [icon]
+                        for _ in range(state.numIcons()):
+                            state.positions  += [(x, y)]
+                            if (flags & DMILoadFlags.NoImages)==0:
+                                state.icons += [self.loadIconAt(x, y)]
                             x += 1
                             # print('%s[%d:%d] x=%d, max_x=%d' % (self.filename,ii,i,x,self.max_x))
                             if(x >= self.max_x):
@@ -271,10 +275,10 @@ state = "void2"
             
     def extractAllStates(self, dest, flags=0):
         for name, state in self.states.iteritems():
-            state = State()
-            for i in range(len(state.icons)):
-                x, y = state.icons[i]
-                self.extractIconAt(name, dest, x, y, i)
+            #state = State()
+            for i in xrange(len(state.positions)):
+                x,y = state.positions[i]
+                self.extractIconAt(state, dest, x, y, i)
              
                 if (flags & DMILoadFlags.NoPostProcessing) == 0:
                     self.states[state.name].postProcess()
@@ -310,12 +314,12 @@ state = "void2"
         return icon
                     
     def extractIconAt(self, state, dest, sx, sy, i=0):
-        icon = self.loadIcon(sx, sy)
+        icon = self.loadIconAt(sx, sy)
         outfolder = os.path.join(dest, os.path.basename(self.filename))
         if not os.path.isdir(outfolder):
             print('\tMKDIR ' + outfolder)
             os.makedirs(outfolder)
-        nfn = state.name + "[%d].png" % i
+        nfn = "{}[{}].png".format(state.name,i)
         valid_chars = "-_.()[] %s%s" % (string.ascii_letters, string.digits)
         nfn = ''.join(c for c in nfn if c in valid_chars)
         nfn = os.path.join(outfolder, nfn)
