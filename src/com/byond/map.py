@@ -2,6 +2,7 @@ import os, itertools, sys
 from com.byond.DMI import DMI
 from com.byond.directions import NORTH, SOUTH, IMAGE_INDICES
 from com.byond.basetypes import Atom, BYONDString, BYONDValue, BYONDFileRef
+from com.byond.objtree import ObjectTree
 from PIL import Image, PngImagePlugin
 
 ID_ENCODING_TABLE = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -22,8 +23,8 @@ def chunker(iterable, chunksize):
         yield wrapped_chunk.pop()
 
 class Tile:
-    FLAG_USE_OLD_ID=1
-    FLAG_INHERITED_PROPERTIES=2
+    FLAG_USE_OLD_ID = 1
+    FLAG_INHERITED_PROPERTIES = 2
     
     def __init__(self):
         self.origID = ''
@@ -45,73 +46,15 @@ class Tile:
             o = o.rjust(pad, ID_ENCODING_TABLE[0])
         return o
     
-    def renderTile(self):
-        frame = Image.new('RGBA', (32, 32))
-        for atom in sorted(self.data,reverse=True):
-            
-            # Ignore /areas.  They look like ass.
-            if atom.path.startswith('/area'):
-                continue
-            
-            if atom.path == '/turf/space':
-                # We're going to turn space black for smaller images.
-                atom.properties['icon_state'].value='black'
-                
-            if 'icon' not in atom.properties:
-                continue
-            dmi_file = atom.properties['icon'].value
-            
-            if 'icon_state' not in atom.properties:
-                #Grab default icon_state ('') if we can't find the one defined.
-                atom.properties['icon_state']=BYONDString("")
-            
-            state = atom.properties['icon_state'].value
-            
-            
-            direction = NORTH
-            if 'dir' in atom.properties:
-                try:
-                    direction = int(atom.properties['dir'].value)
-                except ValueError:
-                    print('FAILED TO READ dir = '+repr(atom.properties['dir'].value))
-                    pass
-            
-            icon_key = '{0}:{1}[{2}]'.format(dmi_file, state, direction)
-            if icon_key not in icons:
-                dmi = None
-                try:
-                    dmi = self.loadDMI(os.path.join(basedir, dmi_file))
-                except Exception:
-                    for prop in ['icon', 'icon_state', 'dir']:
-                        print('\t{0}'.format(atom.dumpPropInfo(prop)))
-                    pass
-                if direction not in IMAGE_INDICES:
-                    direction = NORTH
-                frame = dmi.getFrame(state, direction, 0)
-                if frame == None:
-                    # Get the error/default state.
-                    frame = dmi.getFrame("", direction, 0)
-                    # varState=atom.properties['icon_state']
-                    # varDir=None
-                    # if 'dir' in atom.properties:
-                    #    varDir=atom.properties['dir']
-                    # print('state:{} dir:{} == None'.format(state, direction))
-                    # print('icon_state in {}:{}'.format(varState.filename,varState.line))
-                
-                if frame == None:
-                    continue
-                # print(repr(frame))
-                frame = frame.convert("RGBA")
-                self.tileTypes[tid].frame.paste(frame, (0, 0), frame)  # Add to the top of the stack.
     def __str__(self):
         return self.MapSerialize(Tile.FLAG_USE_OLD_ID)
         
-    def MapSerialize(self,flags=0):
+    def MapSerialize(self, flags=0):
         # "aat" = (/obj/structure/grille,/obj/structure/window/reinforced{dir = 8},/obj/structure/window/reinforced{dir = 1},/obj/structure/window/reinforced,/obj/structure/cable{d1 = 2; d2 = 4; icon_state = "2-4"; tag = ""},/turf/simulated/floor/plating,/area/security/prison)
         atoms = []
-        atomFlags=0
+        atomFlags = 0
         if flags & Tile.FLAG_INHERITED_PROPERTIES:
-            atomFlags = atomFlags | Atom.FLAG_INHERITED_PROPERTIES
+            atomFlags |= Atom.FLAG_INHERITED_PROPERTIES
         for i in xrange(len(self.data)):
             atom = self.data[i]
             if atom.path != '':
@@ -163,7 +106,8 @@ class MapLayer:
         return self.map.tileTypes[self.tiles[y][x]]
     
 class Map:
-    def __init__(self, tree):
+    WRITE_OLD_IDS = 1
+    def __init__(self, tree=None):
         self.tileTypes = []
         self.zLevels = {}
         self.oldID2NewID = {}
@@ -180,11 +124,32 @@ class Map:
             self.consumeTiles(f)
             print('--- Reading tile positions...')
             self.consumeTileMap(f)
+        
+    def writeMap(self, filename, flags=0):
+        self.filename = filename
+        tileFlags = 0
+        if flags & Map.WRITE_OLD_IDS:
+            tileFlags |= Tile.FLAG_USE_OLD_ID
+        with open(filename, 'w') as f:
+            for tile in self.tileTypes:
+                f.write('{0}\n'.format(tile.MapSerialize(tileFlags)))
+            for z in self.zLevels.keys():
+                f.write('\n(1,1,{0}) = {{"\n'.format(z))
+                zlevel = self.zLevels[z]
+                for y in xrange(zlevel.height):
+                    for x in xrange(zlevel.width):
+                        tile = zlevel.GetTileAt(x, y)
+                        if flags & Map.WRITE_OLD_IDS:
+                            f.write(tile.origID)
+                        else:
+                            f.write(tile.ID2String(self.idlen))
+                    f.write("\n")
+                f.write('"}\n')
+                
             
-    def getTileAtPos(self, x, y, z):
+    def GetTileAt(self, x, y, z):
         if z < len(self.zLevels):
-            i = x + (y * self.width)
-            return self.zLevels[z][i]
+            return self.zLevels[z].GetTileAt(x, y)
         
     def consumeTileMap(self, f):
         zLevel = []
@@ -236,8 +201,8 @@ class Map:
         print('--- Generating texture atlas...')
         for tid in xrange(len(self.tileTypes)):
             self.tileTypes[tid].frame = Image.new('RGBA', (96, 96))
-            self.tileTypes[tid].offset=(32,32)
-            for atom in sorted(self.tileTypes[tid].data,reverse=True):
+            self.tileTypes[tid].offset = (32, 32)
+            for atom in sorted(self.tileTypes[tid].data, reverse=True):
                 
                 # Ignore /areas.  They look like ass.
                 if atom.path.startswith('/area'):
@@ -245,7 +210,7 @@ class Map:
                 
                 if atom.path == '/turf/space':
                     # We're going to turn space black for smaller images.
-                    atom.properties['icon_state'].value='black'
+                    atom.properties['icon_state'].value = 'black'
                     
                 if 'icon' not in atom.properties:
                     continue
@@ -253,8 +218,8 @@ class Map:
                 dmi_file = atom.properties['icon'].value
                 
                 if 'icon_state' not in atom.properties:
-                    #Grab default icon_state ('') if we can't find the one defined.
-                    atom.properties['icon_state']=BYONDString("")
+                    # Grab default icon_state ('') if we can't find the one defined.
+                    atom.properties['icon_state'] = BYONDString("")
                 
                 state = atom.properties['icon_state'].value
                 
@@ -263,7 +228,7 @@ class Map:
                     try:
                         direction = int(atom.properties['dir'].value)
                     except ValueError:
-                        print('FAILED TO READ dir = '+repr(atom.properties['dir'].value))
+                        print('FAILED TO READ dir = ' + repr(atom.properties['dir'].value))
                         continue
                 
                 icon_key = '{0}:{1}[{2}]'.format(dmi_file, state, direction)
@@ -276,17 +241,12 @@ class Map:
                             print('\t{0}'.format(atom.dumpPropInfo(prop)))
                         pass
                     
-                    if dmi.img.mode not in ('RGBA','P'):
-                        print('WARNING: {} is mode {}!'.format(dmi_file,dmi.img.mode))
+                    if dmi.img.mode not in ('RGBA', 'P'):
+                        print('WARNING: {} is mode {}!'.format(dmi_file, dmi.img.mode))
                         
                     if direction not in IMAGE_INDICES:
-                        print('WARNING: Unrecognized direction {} on atom {} in tile {}!'.format(direction,atom.MapSerialize(),self.tileTypes[tid].origID))
-                        #tile=Tile()
-                        #tile=self.tileTypes[tid]
-                        #print(tile.MapSerialize())
-                        #print(atom.MapSerialize(Atom.FLAG_INHERITED_PROPERTIES))
-                        #return
-                        direction = SOUTH # DreamMaker property editor shows dir = 2.  WTF?
+                        print('WARNING: Unrecognized direction {} on atom {} in tile {}!'.format(direction, atom.MapSerialize(), self.tileTypes[tid].origID))
+                        direction = SOUTH  # DreamMaker property editor shows dir = 2.  WTF?
                         
                     frame = dmi.getFrame(state, direction, 0)
                     if frame == None:
@@ -303,25 +263,25 @@ class Map:
                         continue
                     # print(repr(frame))
                     frame = frame.convert("RGBA")
-                    pixel_x=0
+                    pixel_x = 0
                     if 'pixel_x' in atom.properties:
-                        pixel_x=int(atom.properties['pixel_x'].value)
-                    pixel_y=0
+                        pixel_x = int(atom.properties['pixel_x'].value)
+                    pixel_y = 0
                     if 'pixel_y' in atom.properties:
-                        pixel_y=int(atom.properties['pixel_y'].value)
-                    self.tileTypes[tid].frame.paste(frame, (32+pixel_x, 32+pixel_y), frame)  # Add to the top of the stack.
+                        pixel_y = int(atom.properties['pixel_y'].value)
+                    self.tileTypes[tid].frame.paste(frame, (32 + pixel_x, 32 + pixel_y), frame)  # Add to the top of the stack.
         print('--- Creating maps...')
         for z in self.zLevels.keys():
             filename = filename_tpl.replace('{z}', str(z))
-            print(' -> {} ({}x{})'.format(filename, (self.zLevels[z].height+2) * 32, (self.zLevels[z].width+2) * 32))
-            zpic = Image.new('RGBA', ((self.zLevels[z].width+2) * 32, (self.zLevels[z].height+2) * 32), "black")
+            print(' -> {} ({}x{})'.format(filename, (self.zLevels[z].height + 2) * 32, (self.zLevels[z].width + 2) * 32))
+            zpic = Image.new('RGBA', ((self.zLevels[z].width + 2) * 32, (self.zLevels[z].height + 2) * 32), "black")
             for y in xrange(self.zLevels[z].height):
                 for x in xrange(self.zLevels[z].width):
                     tile = self.zLevels[z].GetTileAt(x, y)
                     if tile is not None:
                         x_o = 0
                         y_o = 32 - tile.frame.size[1]  # BYOND uses LOWER left as origin for some fucking reason
-                        zpic.paste(tile.frame, ((x * 32) + x_o + tile.offset[0], (y * 32) + y_o + tile.offset[1], (x * 32) + tile.frame.size[0] + x_o+tile.offset[0], (y * 32) + tile.frame.size[0] + y_o+tile.offset[1]), tile.frame)
+                        zpic.paste(tile.frame, ((x * 32) + x_o + tile.offset[0], (y * 32) + y_o + tile.offset[1], (x * 32) + tile.frame.size[0] + x_o + tile.offset[0], (y * 32) + tile.frame.size[0] + y_o + tile.offset[1]), tile.frame)
             zpic.save(filename, 'PNG')
         
             
@@ -337,6 +297,7 @@ class Map:
                 del t.data[i].properties['tag']
         return t
             
+    # TODO: THIS IS GODAWFULLY SLOW
     def consumeTiles(self, f):
         index = 0
         duplicates = 0
@@ -382,6 +343,16 @@ class Map:
     def consumeTileID(self, line):
         e = line.index('"', 1)
         return line[1:e]
+    
+    # So we can read a map without parsing the tree.
+    def GetAtom(self, path):
+        if self.tree is not None:
+            return self.tree.GetAtom(path)
+        return Atom(path)
+    
+    def consumeTileTypes2(self, line, lineNumber):
+        return
+        
     def consumeTileTypes(self, line, lineNumber):
         types = []
         inString = False
@@ -397,7 +368,7 @@ class Map:
             c = line[index]
             if not inProperties:
                 if c == '{':
-                    currentAtom = self.tree.GetAtom(_buffer)
+                    currentAtom = self.GetAtom(_buffer)
                     assert currentAtom != None
                     currentAtom = currentAtom.copy()
                     if debug:
@@ -408,7 +379,7 @@ class Map:
                     continue
                 elif c == ',':
                     if currentAtom == None or currentAtom.path == '':
-                        currentAtom = self.tree.GetAtom(_buffer)
+                        currentAtom = self.GetAtom(_buffer)
                         assert currentAtom != None
                         currentAtom = currentAtom.copy()
                         if debug: print('NEW_ATOM({})'.format(currentAtom.path))
@@ -416,25 +387,31 @@ class Map:
                     _buffer = ''
                         
                     # Compare to base
-                    currentAtom.mapSpecified = []
-                    base_atom = self.tree.GetAtom(currentAtom.path)
+                    currentAtom.SetLayer()
+                    # currentAtom.mapSpecified = []
+                    base_atom = self.GetAtom(currentAtom.path)
                     assert base_atom != None
                     for key in base_atom.properties.keys():
                         val = base_atom.properties[key]
                         if key not in currentAtom.properties:
                             currentAtom.properties[key] = val
                     for key in currentAtom.properties.iterkeys():
-                        val = currentAtom.properties[key]
-                        if key not in base_atom.properties or val != base_atom.properties[key]:
+                        val = currentAtom.properties[key].value
+                        """
+                        if key not in base_atom.properties or val != base_atom.properties[key].value:
                             if key not in currentAtom.mapSpecified:
                                 currentAtom.mapSpecified.append(key)
+                        """
+                        if key in base_atom.properties and val == base_atom.properties[key].value:
+                            if key in currentAtom.mapSpecified:
+                                currentAtom.mapSpecified.remove(key)
                     
                     types += [currentAtom]
                     currentAtom = Atom('')
                     continue
                 elif c == ')':
                     if currentAtom.path == '':
-                        currentAtom = self.tree.GetAtom(_buffer)
+                        currentAtom = self.GetAtom(_buffer)
                         assert currentAtom != None
                         currentAtom = currentAtom.copy()
                         # currentAtom.parent=tmp_atom.parent
@@ -442,18 +419,24 @@ class Map:
                     # print 'buffer was '+_buffer
                         
                     # Compare to base
-                    currentAtom.mapSpecified = []
-                    base_atom = self.tree.GetAtom(currentAtom.path)
+                    currentAtom.SetLayer()
+                    # currentAtom.mapSpecified = []
+                    base_atom = self.GetAtom(currentAtom.path)
                     assert base_atom != None
                     for key in base_atom.properties.keys():
                         val = base_atom.properties[key]
                         if key not in currentAtom.properties:
                             currentAtom.properties[key] = val
                     for key in currentAtom.properties.iterkeys():
-                        val = currentAtom.properties[key]
-                        if key not in base_atom.properties or val != base_atom.properties[key]:
+                        val = currentAtom.properties[key].value
+                        """
+                        if key not in base_atom.properties or val != base_atom.properties[key].value:
                             if key not in currentAtom.mapSpecified:
                                 currentAtom.mapSpecified.append(key)
+                        """
+                        if key in base_atom.properties and val == base_atom.properties[key].value:
+                            if key in currentAtom.mapSpecified:
+                                currentAtom.mapSpecified.remove(key)
                                 
                     if debug: print('NEW_ATOM({})'.format(currentAtom.path))
                     _buffer = ''
@@ -468,12 +451,16 @@ class Map:
                             currentAtom.properties[key] = BYONDString(_buffer.strip(), self.filename, lineNumber)
                         elif stringQuote == "'":
                             currentAtom.properties[key] = BYONDFileRef(_buffer.strip(), self.filename, lineNumber)
+                        elif stringQuote == ')':
+                            currentAtom.properties[key] = BYONDValue(_buffer.strip() + ')', self.filename, lineNumber)
                         else:
                             currentAtom.properties[key] = BYONDValue(_buffer.strip(), self.filename, lineNumber)
-                        
+                        if key not in currentAtom.mapSpecified:
+                            currentAtom.mapSpecified += [key]
                         if debug: print('PROPERTY({},{})'.format(key, currentAtom.properties[key]))
                         
                         _buffer = ''
+                        stringQuote = None
                         inProperties = False
                         
                         if debug: print('PROPERTIES_END({})'.format(repr(currentAtom.properties)))
@@ -484,10 +471,15 @@ class Map:
                             currentAtom.properties[key] = BYONDString(_buffer.strip(), self.filename, lineNumber)
                         elif stringQuote == "'":
                             currentAtom.properties[key] = BYONDFileRef(_buffer.strip(), self.filename, lineNumber)
+                        elif stringQuote == ')':
+                            currentAtom.properties[key] = BYONDValue(_buffer.strip() + ')', self.filename, lineNumber)
                         else:
                             currentAtom.properties[key] = BYONDValue(_buffer.strip(), self.filename, lineNumber)
+                        if key not in currentAtom.mapSpecified:
+                            currentAtom.mapSpecified += [key]
                         if debug: print('PROPERTY({},{})'.format(key, currentAtom.properties[key]))
                         _buffer = ''
+                        stringQuote = None
                         continue
                     elif c == '=':
                         key = _buffer.strip()
@@ -497,6 +489,9 @@ class Map:
                         inString = True
                         stringQuote = c
                         continue
+                    elif c == '(':
+                        inString = True
+                        stringQuote = ')'
                 else:
                     if c == stringQuote and line[index - 1] != '\\':
                         inString = False

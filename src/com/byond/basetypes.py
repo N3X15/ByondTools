@@ -4,11 +4,11 @@ Created on Nov 6, 2013
 @author: Rob
 '''
 import logging
-AREA_LAYER =   1
-TURF_LAYER =   2
-OBJ_LAYER  =   3
-MOB_LAYER  =   4
-FLY_LAYER  =   5
+AREA_LAYER = 1
+TURF_LAYER = 2
+OBJ_LAYER = 3
+MOB_LAYER = 4
+FLY_LAYER = 5
 
 
 class BYONDValue:
@@ -53,9 +53,9 @@ class BYONDString(BYONDValue):
         return '<BYONDString value="{}" filename="{}" line={}>'.format(self.value, self.filename, self.line)
     
 class Atom:
-    FLAG_INHERITED_PROPERTIES=1
+    FLAG_INHERITED_PROPERTIES = 1
     def __init__(self, path, filename='', line=0):
-        global TURF_LAYER,AREA_LAYER,OBJ_LAYER,MOB_LAYER
+        global TURF_LAYER, AREA_LAYER, OBJ_LAYER, MOB_LAYER
         
         self.path = path
         self.properties = {}
@@ -65,14 +65,21 @@ class Atom:
         self.filename = filename
         self.line = line
         
-        if path.startswith('/turf'):
-            self.properties['layer']=BYONDValue(TURF_LAYER)
-        elif path.startswith('/area'):
-            self.properties['layer']=BYONDValue(AREA_LAYER)
-        elif path.startswith('/obj'):
-            self.properties['layer']=BYONDValue(OBJ_LAYER)
-        elif path.startswith('/mob'):
-            self.properties['layer']=BYONDValue(MOB_LAYER)
+        self.SetLayer()
+        
+    def SetLayer(self):
+        if 'layer' in self.properties:
+            return
+        if self.path.startswith('/turf'):
+            self.properties['layer'] = BYONDValue(TURF_LAYER)
+        elif self.path.startswith('/area'):
+            self.properties['layer'] = BYONDValue(AREA_LAYER)
+        elif self.path.startswith('/obj'):
+            self.properties['layer'] = BYONDValue(OBJ_LAYER)
+        elif self.path.startswith('/mob'):
+            self.properties['layer'] = BYONDValue(MOB_LAYER)
+        else:
+            self.properties['layer'] = BYONDValue(OBJ_LAYER)
         
     def copy(self):
         new_node = Atom(self.path)
@@ -105,7 +112,6 @@ class Atom:
             return False
         myLayer = float(self.properties['layer'].value)
         otherLayer = float(other.properties['layer'].value)
-        logging.debug('LAYER FOR {}: {}',self.MapSerialize(),myLayer)
         return myLayer > otherLayer
         
     def __gt__(self, other):
@@ -115,14 +121,15 @@ class Atom:
         otherLayer = float(other.properties['layer'].value)
         return myLayer < otherLayer
     
-    def MapSerialize(self,flags=0):
+    def MapSerialize(self, flags=0):
         atomContents = []
         # print(repr(self.mapSpecified))
-        if flags & Atom.FLAG_INHERITED_PROPERTIES:
-            for key, val in self.properties.iteritems():
+        if (flags & Atom.FLAG_INHERITED_PROPERTIES):
+            for key, val in self.properties.items():
                 atomContents += ['{0} = {1}'.format(key, val)]
         else:
-            for key in self.mapSpecified:
+            for i in range(len(self.mapSpecified)):
+                key = self.mapSpecified[i]
                 val = self.properties[key]
                 atomContents += ['{0} = {1}'.format(key, val)]
         if len(atomContents) > 0:
@@ -140,9 +147,9 @@ class Atom:
 class Proc(Atom):
     def __init__(self, path, arguments, filename='', line=0):
         Atom.__init__(self, path, filename, line)
-        self.arguments=arguments
+        self.arguments = arguments
         
-    def MapSerialize(self,flags=0):
+    def MapSerialize(self, flags=0):
         return None
     
     def InheritProperties(self):

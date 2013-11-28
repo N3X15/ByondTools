@@ -18,9 +18,9 @@ from ply import *
 ##############################
 class IndentLexer(object):
     """
-A second lexing stage that interprets WHITESPACE
-Manages Off-Side Rule for indentation
-"""
+    A second lexing stage that interprets WHITESPACE
+    Manages Off-Side Rule for indentation
+    """
     def __init__(self, lexer):
         self.indents = [0]  # indentation stack
         self.tokens = []  # token queue
