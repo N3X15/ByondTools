@@ -6,7 +6,7 @@ from .basetypes import *
 
 REGEX_TABS = re.compile('^(?P<tabs>\t*)')  # \s*$
 REGEX_VARIABLE_STRING = re.compile('^(?P<tabs>\t+)(?:var/)?(?P<type>[a-zA-Z0-9_]*/)?(?P<variable>[a-zA-Z0-9_]+)\s*=\s*(?P<qmark>[\'"])(?P<content>.+)(?P=qmark)\s*$')
-REGEX_VARIABLE_NUMBER = re.compile('^(?P<tabs>\t+)(?:var/)?(?P<type>[a-zA-Z0-9_]*/)?(?P<variable>[a-zA-Z0-9_]+)\s*=\s*(?P<content>[0-9\.]+)\s*$')
+REGEX_VARIABLE_NUMBER = re.compile('^(?P<tabs>\t+)(?:var/)?(?P<type>[a-zA-Z0-9_]*/)?(?P<variable>[a-zA-Z0-9_]+)\s*=\s*(?P<content>[0-9\.\-]+)\s*$')
 REGEX_ATOMDEF = re.compile('^(?P<tabs>\t*)(?P<atom>[a-zA-Z0-9_/]+)\\{?\\s*$')
 REGEX_ABSOLUTE_PROCDEF = re.compile('^(?P<tabs>\t*)(?P<atom>[a-zA-Z0-9_/]+)/(?P<proc>[a-zA-Z0-9_]+)\((?P<args>.*)\)\\{?\s*$')
 REGEX_RELATIVE_PROCDEF = re.compile('^(?P<tabs>\t*)(?P<proc>[a-zA-Z0-9_]+)\((?P<args>.*)\)\\{?\\s*$')

@@ -1,8 +1,8 @@
 import os, itertools, sys
 from com.byond.DMI import DMI
-from com.byond.directions import NORTH, SOUTH, IMAGE_INDICES
+from com.byond.directions import SOUTH, IMAGE_INDICES
 from com.byond.basetypes import Atom, BYONDString, BYONDValue, BYONDFileRef
-from com.byond.objtree import ObjectTree
+#from com.byond.objtree import ObjectTree
 from PIL import Image, PngImagePlugin
 
 ID_ENCODING_TABLE = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -34,14 +34,14 @@ class Tile:
     
     def ID2String(self, pad=0):
         o = ''
-        id = self.ID
+        _id = self.ID
         IET_SIZE = len(ID_ENCODING_TABLE)
-        while(id >= len(ID_ENCODING_TABLE)):
-            i = id % IET_SIZE
+        while(_id >= len(ID_ENCODING_TABLE)):
+            i = _id % IET_SIZE
             o = ID_ENCODING_TABLE[i] + o
-            id -= i
-            id /= IET_SIZE
-        o = ID_ENCODING_TABLE[id] + o
+            _id -= i
+            _id /= IET_SIZE
+        o = ID_ENCODING_TABLE[_id] + o
         if pad > len(o):
             o = o.rjust(pad, ID_ENCODING_TABLE[0])
         return o
@@ -71,8 +71,8 @@ class Tile:
             return all(self.data[i] == other.data[i] for i in range(len(self.data)))
     
 class MapLayer:
-    def __init__(self, map, height=255, width=255):
-        self.map = map
+    def __init__(self, _map, height=255, width=255):
+        self.map = _map
         self.min = (1, 1)
         self.max = (height, width)
         self.height = height
@@ -116,6 +116,17 @@ class Map:
         self.height = 0
         self.idlen = 0
         self.tree = tree
+    
+        self.atomBorders = {
+            '{':'}',
+            '"':'"',
+            '(':')'
+        }
+        nit = self.atomBorders.copy()
+        for start, stop in self.atomBorders.items():
+            if start != stop:
+                nit[stop] = None
+        self.atomBorders = nit
         
     def readMap(self, filename):
         self.filename = filename
@@ -309,7 +320,7 @@ class Map:
             if line.startswith('"'):
                 t = Tile()
                 t.origID = self.consumeTileID(line)
-                t.data = self.consumeTileTypes(line[line.index('(') + 1:], lineNumber)
+                t.data = self.consumeTileAtoms(line.strip()[line.index('(') + 1:-1], lineNumber)
                 t.ID = index
                 # if line.startswith('"aav"'):
                 #    print(t.__str__(True))
@@ -350,150 +361,151 @@ class Map:
             return self.tree.GetAtom(path)
         return Atom(path)
     
-    def consumeTileTypes2(self, line, lineNumber):
-        return
+    def consumeTileAtoms(self, line, lineNumber):
+        atoms = []
+        atom_chunks = self.SplitAtoms(line)
+        # print(line)
+        # print(repr(atom_chunks))
+        for atom_chunk in atom_chunks:
+            atoms += [self.consumeAtom(atom_chunk, lineNumber)]
         
-    def consumeTileTypes(self, line, lineNumber):
-        types = []
+        # if '{' in line:
+        #    sys.exit()
+        return atoms
+    
+    def SplitProperties(self, string):
+        o = []
+        buf = []
         inString = False
-        stringQuote = ''
-        _buffer = ''
-        inProperties = False
-        index = -1
-        currentAtom = Atom('')
-        key = ''
-        debug = False
-        while(True):
-            index += 1
-            c = line[index]
-            if not inProperties:
-                if c == '{':
-                    currentAtom = self.GetAtom(_buffer)
-                    assert currentAtom != None
-                    currentAtom = currentAtom.copy()
-                    if debug:
-                        print('NEW_ATOM({})'.format(currentAtom.path))
-                        print('PROPERTIES_START')
-                    _buffer = ''
-                    inProperties = True
-                    continue
-                elif c == ',':
-                    if currentAtom == None or currentAtom.path == '':
-                        currentAtom = self.GetAtom(_buffer)
-                        assert currentAtom != None
-                        currentAtom = currentAtom.copy()
-                        if debug: print('NEW_ATOM({})'.format(currentAtom.path))
-                    # print 'buffer was '+_buffer
-                    _buffer = ''
-                        
-                    # Compare to base
-                    currentAtom.SetLayer()
-                    # currentAtom.mapSpecified = []
-                    base_atom = self.GetAtom(currentAtom.path)
-                    assert base_atom != None
-                    for key in base_atom.properties.keys():
-                        val = base_atom.properties[key]
-                        if key not in currentAtom.properties:
-                            currentAtom.properties[key] = val
-                    for key in currentAtom.properties.iterkeys():
-                        val = currentAtom.properties[key].value
-                        """
-                        if key not in base_atom.properties or val != base_atom.properties[key].value:
-                            if key not in currentAtom.mapSpecified:
-                                currentAtom.mapSpecified.append(key)
-                        """
-                        if key in base_atom.properties and val == base_atom.properties[key].value:
-                            if key in currentAtom.mapSpecified:
-                                currentAtom.mapSpecified.remove(key)
-                    
-                    types += [currentAtom]
-                    currentAtom = Atom('')
-                    continue
-                elif c == ')':
-                    if currentAtom.path == '':
-                        currentAtom = self.GetAtom(_buffer)
-                        assert currentAtom != None
-                        currentAtom = currentAtom.copy()
-                        # currentAtom.parent=tmp_atom.parent
-                        # currentAtom.children=tmp_atom.children
-                    # print 'buffer was '+_buffer
-                        
-                    # Compare to base
-                    currentAtom.SetLayer()
-                    # currentAtom.mapSpecified = []
-                    base_atom = self.GetAtom(currentAtom.path)
-                    assert base_atom != None
-                    for key in base_atom.properties.keys():
-                        val = base_atom.properties[key]
-                        if key not in currentAtom.properties:
-                            currentAtom.properties[key] = val
-                    for key in currentAtom.properties.iterkeys():
-                        val = currentAtom.properties[key].value
-                        """
-                        if key not in base_atom.properties or val != base_atom.properties[key].value:
-                            if key not in currentAtom.mapSpecified:
-                                currentAtom.mapSpecified.append(key)
-                        """
-                        if key in base_atom.properties and val == base_atom.properties[key].value:
-                            if key in currentAtom.mapSpecified:
-                                currentAtom.mapSpecified.remove(key)
-                                
-                    if debug: print('NEW_ATOM({})'.format(currentAtom.path))
-                    _buffer = ''
-                    types += [currentAtom]
-                    currentAtom = Atom('')
-                    return types
-            else:
-                if not inString:
-                    if c == '}':
-                        # print 'buffer was '+_buffer
-                        if stringQuote == '"':
-                            currentAtom.properties[key] = BYONDString(_buffer.strip(), self.filename, lineNumber)
-                        elif stringQuote == "'":
-                            currentAtom.properties[key] = BYONDFileRef(_buffer.strip(), self.filename, lineNumber)
-                        elif stringQuote == ')':
-                            currentAtom.properties[key] = BYONDValue(_buffer.strip() + ')', self.filename, lineNumber)
-                        else:
-                            currentAtom.properties[key] = BYONDValue(_buffer.strip(), self.filename, lineNumber)
-                        if key not in currentAtom.mapSpecified:
-                            currentAtom.mapSpecified += [key]
-                        if debug: print('PROPERTY({},{})'.format(key, currentAtom.properties[key]))
-                        
-                        _buffer = ''
-                        stringQuote = None
-                        inProperties = False
-                        
-                        if debug: print('PROPERTIES_END({})'.format(repr(currentAtom.properties)))
-                        continue
-                    elif c == ';':
-                        # print currentAtom.type+': ['+key+'] buffer was '+_buffer
-                        if stringQuote == '"':
-                            currentAtom.properties[key] = BYONDString(_buffer.strip(), self.filename, lineNumber)
-                        elif stringQuote == "'":
-                            currentAtom.properties[key] = BYONDFileRef(_buffer.strip(), self.filename, lineNumber)
-                        elif stringQuote == ')':
-                            currentAtom.properties[key] = BYONDValue(_buffer.strip() + ')', self.filename, lineNumber)
-                        else:
-                            currentAtom.properties[key] = BYONDValue(_buffer.strip(), self.filename, lineNumber)
-                        if key not in currentAtom.mapSpecified:
-                            currentAtom.mapSpecified += [key]
-                        if debug: print('PROPERTY({},{})'.format(key, currentAtom.properties[key]))
-                        _buffer = ''
-                        stringQuote = None
-                        continue
-                    elif c == '=':
-                        key = _buffer.strip()
-                        _buffer = ''
-                        continue
-                    elif c in ['"', "'"]:
-                        inString = True
-                        stringQuote = c
-                        continue
-                    elif c == '(':
-                        inString = True
-                        stringQuote = ')'
+        # print('>>> {0}'.format(string))
+        for chunk in string.split(';'):
+            # print(chunk)
+            if not inString:
+                # chunk="REMOVE ME"
+                # print('o='+repr(o))
+                if '"' in chunk:
+                    inString = False
+                    pos = 0
+                    while(True):
+                        pos = chunk.find('"', pos)
+                        # print('{0}: {1}'.format(pos,chunk[pos:]))
+                        if pos == -1:
+                            break
+                        pc = ''
+                        if pos > 0:
+                            pc = chunk[pos - 1]
+                        # print(pc)
+                        if pc != '\\':
+                            inString = not inString
+                        pos += 1
+                    if not inString:
+                        o += [chunk]
+                    else:
+                        buf += [chunk]
                 else:
-                    if c == stringQuote and line[index - 1] != '\\':
-                        inString = False
-                        continue
-            _buffer += c
+                    o += [chunk]
+            else:
+                if '"' in chunk:
+                    o += [';'.join(buf + [chunk])]
+                    inString = False
+                    buf = []
+                else:
+                    buf += [chunk]
+        return o
+    
+    def SplitAtoms(self, string):
+        ignoreLevel = []
+        
+        o = []
+        buf = ''
+        
+        string = string.rstrip()
+        line_len = len(string)
+        for i in xrange(line_len):
+            c = string[i]
+            pc = ''
+            if i > 0:
+                pc = string[i - 1]
+            
+            if c in self.atomBorders and pc != '\\':
+                end = self.atomBorders[c]
+                if end == c:  # Just toggle.
+                    if len(ignoreLevel) > 0:
+                        if ignoreLevel[-1] == c:
+                            ignoreLevel.pop()
+                            # print('POP '+c)
+                        else:
+                            ignoreLevel.append(c)
+                            # print('PUSH '+c)
+                else:
+                    if end == None:
+                        if len(ignoreLevel) > 0:
+                            if ignoreLevel[-1] == c:
+                                ignoreLevel.pop()
+                                # print('POP '+c)
+                    else:
+                        ignoreLevel.append(end)
+                        # print('PUSH '+end)
+            if c == ',' and len(ignoreLevel) == 0:
+                o += [buf]
+                buf = ''
+            else:
+                buf += c
+                    
+        if len(ignoreLevel) > 0:
+            print(repr(ignoreLevel))
+            sys.exit()
+        return o + [buf]
+    
+    def consumeAtom(self, line, lineNumber):
+        if '{' not in line:
+            currentAtom = self.GetAtom(line.strip())
+            if currentAtom is not None:
+                return currentAtom.copy()
+        chunks = line.split('{')
+        currentAtom = self.GetAtom(chunks[0].strip())
+        if currentAtom is not None:
+            currentAtom = currentAtom.copy()
+        if chunks[1].endswith('}'):
+            chunks[1] = chunks[1][:-1]
+        property_chunks = self.SplitProperties(chunks[1])
+        for chunk in property_chunks:
+            if chunk.endswith('}'):
+                chunk = chunk[:-1]
+            pparts = chunk.split(' = ',1)
+            key = pparts[0].strip()
+            value = pparts[1].strip()
+            data = self.consumeDataValue(value, lineNumber)
+            
+            currentAtom.properties[key] = data
+            if key not in currentAtom.mapSpecified:
+                currentAtom.mapSpecified += [key]
+                
+        # Compare to base
+        currentAtom.SetLayer()
+        # currentAtom.mapSpecified = []
+        base_atom = self.GetAtom(currentAtom.path)
+        assert base_atom != None
+        for key in base_atom.properties.keys():
+            val = base_atom.properties[key]
+            if key not in currentAtom.properties:
+                currentAtom.properties[key] = val
+        for key in currentAtom.properties.iterkeys():
+            val = currentAtom.properties[key].value
+            if key in base_atom.properties and val == base_atom.properties[key].value:
+                if key in currentAtom.mapSpecified:
+                    currentAtom.mapSpecified.remove(key)
+        return currentAtom
+            
+    def consumeDataValue(self, value, lineNumber):
+        data = None
+        if value[0] in ('"', "'"):
+            quote = value[0]
+            if quote == '"':
+                data = BYONDString(value[1:-1], self.filename, lineNumber)
+            elif quote == "'":
+                data = BYONDFileRef(value[1:-1], self.filename, lineNumber)
+        else:
+            data = BYONDValue(value, self.filename, lineNumber)
+        return data
+    
