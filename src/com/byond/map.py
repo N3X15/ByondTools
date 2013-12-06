@@ -2,7 +2,7 @@ import os, itertools, sys
 from com.byond.DMI import DMI
 from com.byond.directions import SOUTH, IMAGE_INDICES
 from com.byond.basetypes import Atom, BYONDString, BYONDValue, BYONDFileRef
-#from com.byond.objtree import ObjectTree
+# from com.byond.objtree import ObjectTree
 from PIL import Image, PngImagePlugin
 
 ID_ENCODING_TABLE = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -188,20 +188,16 @@ class Map:
                 inZLevel = False
                 if height == 0:
                     height = y
-                # self.zLevels[z] = MapLayer(self, height, width)
-                # self.zLevels[z].tiles = zLevel
                 self.zLevels[z] = zLevel
                 print('Added map layer {0} ({1}x{2})'.format(z, height, width))
                 continue
             if inZLevel:
                 if width == 0:
                     width = len(line) / self.idlen
-                # self.zLevels[currentZLevel] += [self.oldID2NewID[line[i:i + self.idlen]] for i in range(0, len(line), self.idlen)]
                 x = 0
                 for chunk in chunker(line.strip(), self.idlen):
                     chunk = ''.join(chunk)
                     tid = self.oldID2NewID[chunk]
-                    # print('{0} => {1}'.format(chunk,tid))
                     zLevel.SetTileAt(x, y, self.tileTypes[tid])
                     x += 1
                 y += 1
@@ -211,19 +207,24 @@ class Map:
         icons = {}
         print('--- Generating texture atlas...')
         for tid in xrange(len(self.tileTypes)):
-            self.tileTypes[tid].frame = Image.new('RGBA', (96, 96))
-            self.tileTypes[tid].offset = (32, 32)
-            for atom in sorted(self.tileTypes[tid].data, reverse=True):
+            tile = self.tileTypes[tid]
+            img = Image.new('RGBA', (96, 96))
+            tile.offset = (32, 32)
+            for atom in sorted(tile.data, reverse=True):
                 
+                aid = tile.data.index(atom)
                 # Ignore /areas.  They look like ass.
                 if atom.path.startswith('/area'):
                     continue
                 
+                # We're going to turn space black for smaller images.
                 if atom.path == '/turf/space':
-                    # We're going to turn space black for smaller images.
-                    atom.properties['icon_state'].value = 'black'
+                    continue
                     
                 if 'icon' not in atom.properties:
+                    print('CRITICAL: UNKNOWN ICON IN {0} (atom #{1})'.format(tile.origID, aid))
+                    print(atom.MapSerialize())
+                    print(atom.MapSerialize(Atom.FLAG_INHERITED_PROPERTIES))
                     continue
                 
                 dmi_file = atom.properties['icon'].value
@@ -256,31 +257,38 @@ class Map:
                         print('WARNING: {} is mode {}!'.format(dmi_file, dmi.img.mode))
                         
                     if direction not in IMAGE_INDICES:
-                        print('WARNING: Unrecognized direction {} on atom {} in tile {}!'.format(direction, atom.MapSerialize(), self.tileTypes[tid].origID))
+                        print('WARNING: Unrecognized direction {} on atom {} in tile {}!'.format(direction, atom.MapSerialize(), tile.origID))
                         direction = SOUTH  # DreamMaker property editor shows dir = 2.  WTF?
                         
                     frame = dmi.getFrame(state, direction, 0)
                     if frame == None:
                         # Get the error/default state.
                         frame = dmi.getFrame("", direction, 0)
-                        # varState=atom.properties['icon_state']
-                        # varDir=None
-                        # if 'dir' in atom.properties:
-                        #    varDir=atom.properties['dir']
-                        # print('state:{} dir:{} == None'.format(state, direction))
-                        # print('icon_state in {}:{}'.format(varState.filename,varState.line))
                     
                     if frame == None:
                         continue
-                    # print(repr(frame))
-                    frame = frame.convert("RGBA")
+                    
+                    # This is a stupid hack to work around BYOND generating indexed PNGs with unspecified transparency.
+                    # Uncorrected, this will result in PIL(low) trying to read the colors as alpha.
+                    if frame.mode == 'P' and 'transparency' not in frame.info:
+                        print('WARNING ({0}): Indexed PNG does not specify transparency! Setting black as transparency. frame.info = {1}'.format(icon_key, repr(frame.info)))
+                        frame.info['transparency'] = frame.palette.getcolor((0, 0, 0))
+                    
+                    if frame.mode != 'RGBA':
+                        frame = frame.convert("RGBA")
+                        
                     pixel_x = 0
                     if 'pixel_x' in atom.properties:
                         pixel_x = int(atom.properties['pixel_x'].value)
+                        
                     pixel_y = 0
                     if 'pixel_y' in atom.properties:
                         pixel_y = int(atom.properties['pixel_y'].value)
-                    self.tileTypes[tid].frame.paste(frame, (32 + pixel_x, 32 + pixel_y), frame)  # Add to the top of the stack.
+                        
+                    img.paste(frame, (32 + pixel_x, 32 + pixel_y), frame)  # Add to the top of the stack.
+            tile.frame = img
+            self.tileTypes[tid] = tile
+            
         print('--- Creating maps...')
         for z in self.zLevels.keys():
             filename = filename_tpl.replace('{z}', str(z))
@@ -472,7 +480,7 @@ class Map:
         for chunk in property_chunks:
             if chunk.endswith('}'):
                 chunk = chunk[:-1]
-            pparts = chunk.split(' = ',1)
+            pparts = chunk.split(' = ', 1)
             key = pparts[0].strip()
             value = pparts[1].strip()
             data = self.consumeDataValue(value, lineNumber)
