@@ -7,7 +7,7 @@ fixMap.py map.dmm replacements.txt
 """
 import sys
 from com.byond.map import Map
-from com.byond.basetypes import BYONDString, BYONDValue
+from com.byond.basetypes import BYONDString, BYONDValue, Atom
 
 class Matcher:
     def Matches(self, atom):
@@ -44,6 +44,34 @@ class RenameProperty(Matcher):
             return 'Removed {0}'.format(self.old)
         else:
             return 'Renamed {0} to {1}'.format(self.old, self.new)
+    
+class StandardizeManifolds(Matcher):
+    STATE_TO_TYPE={
+        'manifold-b-f':'/obj/machinery/atmospherics/pipe/manifold/supply/hidden',
+        'manifold-r-f':'/obj/machinery/atmospherics/pipe/manifold/scrubbers/hidden',
+        'manifold-f':'/obj/machinery/atmospherics/pipe/manifold/general/hidden',
+        'manifold-b':'/obj/machinery/atmospherics/pipe/manifold/supply/visible',
+        'manifold-r':'/obj/machinery/atmospherics/pipe/manifold/scrubbers/visible',
+        'manifold':'/obj/machinery/atmospherics/pipe/manifold/general/visible',
+    }
+    def __init__(self):
+        return
+        
+    def Matches(self, atom):
+        if atom.path == '/obj/machinery/atmospherics/pipe/manifold' and 'icon_state' in atom.mapSpecified:
+            return atom.properties['icon_state'].value in self.STATE_TO_TYPE
+        return False
+    
+    def Fix(self, atom):
+        icon_state=atom.properties['icon_state'].value
+        new_atom=Atom(self.STATE_TO_TYPE[icon_state])
+        if 'dir' in atom.mapSpecified:
+            new_atom.properties['dir']=BYONDValue(atom.properties['dir'].value)
+            new_atom.mapSpecified += ['dir']
+        return new_atom
+    
+    def __str__(self):
+        return 'Standardized pipe manifold'
     
 class ChangeType(Matcher):
     def __init__(self, old, new):
@@ -86,7 +114,10 @@ actions = [
     RenameProperty('step_y', 'pixel_y'),
     
     # Fix older network definitions
-    FixNetwork()
+    FixNetwork(),
+    
+    # Standardize pipes
+    StandardizeManifolds()
 ]
 with open(sys.argv[2], 'r') as repl:
     for line in repl:
