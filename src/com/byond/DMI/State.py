@@ -58,10 +58,10 @@ state = "void"
         
         o += '\n\timport pngs {' 
         for vdir in range(self.dirs):
-            dir = directions.IMAGE_INDICES[vdir]
-            o += '\n\t\tdirection "%s" {' % directions.getNameFromDir(dir)
+            _dir = directions.IMAGE_INDICES[vdir]
+            o += '\n\t\tdirection "%s" {' % directions.getNameFromDir(_dir)
             for f in range(self.frames):
-                o += '\n\t\t\t"%s"' % self.getFrame(dir, f)
+                o += '\n\t\t\t"%s"' % self.getFrame(_dir, f)
             o += '\n\t\t}'
         o += '\n\t}'
         o += "\n}"
@@ -94,7 +94,7 @@ state = "void"
         _dir = 0
         if self.dirs == 4 or self.dirs == 8:
             _dir = directions.IMAGE_INDICES.index(direction)
-            if self.dirs == 4 and dir > 3:
+            if self.dirs == 4 and _dir > 3:
                 _dir = 0
             
         frame = _dir + (frame * self.dirs)
