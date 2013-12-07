@@ -286,7 +286,7 @@ class Map:
                     if 'pixel_y' in atom.properties:
                         pixel_y = int(atom.properties['pixel_y'].value)
                         
-                    img.paste(frame, (32 + pixel_x, 32 + pixel_y), frame)  # Add to the top of the stack.
+                    img.paste(frame, (32 + pixel_x, 32 - pixel_y), frame)  # Add to the top of the stack.
             tile.frame = img
             self.tileTypes[tid] = tile
             
