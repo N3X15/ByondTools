@@ -22,8 +22,8 @@ class DMI:
     max_x = -1
     max_y = -1
     
-    def __init__(self, file):
-        self.filename = file
+    def __init__(self, filename):
+        self.filename = filename
         self.version = ''
         self.states = {}
         self.iw = 32
@@ -54,7 +54,6 @@ class DMI:
                         self.states[name] = dmi.states[name]
                         
     def save(self, to):
-            
         # Now build the manifest
         manifest = 'version = 4.0'
         manifest += '\r\n        width = {0}'.format(self.iw)
@@ -69,16 +68,18 @@ class DMI:
         # Next bit borrowed from DMIDE.
         icons_per_row = math.ceil(math.sqrt(len(frames)))
         rows = icons_per_row
+        
         if len(frames) > icons_per_row * rows:
             rows += 1
-        map = Image.new('RGBA', (icons_per_row * self.iw, rows * self.ih))
+            
+        sheet = Image.new('RGBA', (icons_per_row * self.iw, rows * self.ih))
         
         x = 0
         y = 0
         for frame in frames:
             # print(frame)
             icon = Image.open(frame, 'r')
-            map.paste(icon, (x * self.iw, y * self.ih))
+            sheet.paste(icon, (x * self.iw, y * self.ih))
             x += 1
             if x > icons_per_row:
                 y += 1
@@ -89,16 +90,16 @@ class DMI:
         meta = PngImagePlugin.PngInfo()
 
         # copy metadata into new object
-        
         reserved = ('interlace', 'gamma', 'dpi', 'transparency', 'aspect')
-        for k, v in map.info.items():
+        for k, v in sheet.info.items():
                 if k in reserved: continue
                 meta.add_text(k, v, 1)
+                
         # Only need one - Rob
         meta.add_text(b'Description', manifest.encode('ascii'), 1)
 
         # and save
-        map.save(to, 'PNG', pnginfo=meta)
+        sheet.save(to, 'PNG', pnginfo=meta)
         
         print('>>> {0} states saved to {1}'.format(len(frames), to))
 
@@ -120,7 +121,7 @@ class DMI:
         return ''
     
     def extractTo(self, dest, suppress_post_process=False):
-        flags=0
+        flags = 0
         if(suppress_post_process):
             flags |= DMILoadFlags.NoPostProcessing
         print('>>> Loading %s...' % self.filename)
@@ -128,14 +129,13 @@ class DMI:
         print('>>> Extracting %s...' % self.filename)
         self.extractAllStates(dest, flags)
     
-    def getFrame(self, state, dir, frame):
+    def getFrame(self, state, direction, frame):
         if state not in self.states:
             return None
-        return self.states[state].getFrame(dir, frame)
+        return self.states[state].getFrame(direction, frame)
     
     def getHeader(self):
         img = Image.open(self.filename)
-        # print(repr(img.info))
         if(b'Description' not in img.info):
             raise Exception("DMI Description is not in the information headers!")
         return img.info[b'Description'].decode('ascii')
@@ -148,12 +148,12 @@ class DMI:
         meta = PngImagePlugin.PngInfo()
 
         # copy metadata into new object
-        
-        reserved = ('interlace', 'gamma', 'dpi', 'transparency', 'aspect','icc_profile')
+        reserved = ('interlace', 'gamma', 'dpi', 'transparency', 'aspect', 'icc_profile')
         for k, v in img.info.items():
                 if k in reserved: continue
-                print(k,v)
+                print(k, v)
                 meta.add_text(k, v, 1)
+                
         # Only need one - Rob
         meta.add_text(b'Description', newHeader.encode('ascii'), 1)
 
@@ -168,23 +168,29 @@ class DMI:
         self.load(flags)
     
     def load(self, flags):
-        #if self.dest is None:
-        #    suppress_post_process = True
         self.img = Image.open(self.filename)
         
         # This is a stupid hack to work around BYOND generating indexed PNGs with unspecified transparency.
         # Uncorrected, this will result in PIL(low) trying to read the colors as alpha.
         if self.img.mode == 'P':
+            # If there's no transparency, set it to black.
             if 'transparency' not in self.img.info:
                 print('WARNING ({0}): Indexed PNG does not specify transparency! Setting black as transparency. self.img.info = {1}'.format(self.filename, repr(self.img.info)))
                 self.img.info['transparency'] = self.img.palette.getcolor((0, 0, 0))
-                self.img.save(self.filename+"(RENDER).png",'PNG')
+                
+            # Always use RGBA, it causes less problems.
             self.img = self.img.convert('RGBA')
+            
         self.size = self.img.size
-        # print(repr(img.info))
+
+        # Sanity
         if(b'Description' not in self.img.info):
             raise Exception("DMI Description is not in the information headers!")
+        
+        # Load pixels from image
         self.pixels = self.img.load()
+        
+        # Load DMI header
         desc = self.img.info[b'Description'].decode('ascii')
         """
 version = 4.0
@@ -242,8 +248,8 @@ state = "void2"
                             self.max_x = self.img.size[0] / self.iw
                             self.max_y = self.img.size[1] / self.iw
                         for _ in range(state.numIcons()):
-                            state.positions  += [(x, y)]
-                            if (flags & DMILoadFlags.NoImages)==0:
+                            state.positions += [(x, y)]
+                            if (flags & DMILoadFlags.NoImages) == 0:
                                 state.icons += [self.loadIconAt(x, y)]
                             x += 1
                             # print('%s[%d:%d] x=%d, max_x=%d' % (self.filename,ii,i,x,self.max_x))
@@ -251,7 +257,7 @@ state = "void2"
                                 x = 0
                                 y += 1
                         self.states[state.name] = state
-                        #if not suppress_post_process:
+                        # if not suppress_post_process:
                         #    self.states[state.name].postProcess()
                         ii += 1
                     state = State(value)
@@ -274,19 +280,18 @@ state = "void2"
                     sys.exit()
         
         self.states[state.name] = state
-        for i in range(state.numIcons()):
+        for _ in range(state.numIcons()):
             self.states[state.name].icons += [self.loadIconAt(x, y)]
             x += 1
-            # print('%s[%d:%d] x=%d, max_x=%d' % (self.filename,ii,i,x,self.max_x))
             if(x >= self.max_x):
                 x = 0
                 y += 1
             
     def extractAllStates(self, dest, flags=0):
         for name, state in self.states.iteritems():
-            #state = State()
+            # state = State()
             for i in xrange(len(state.positions)):
-                x,y = state.positions[i]
+                x, y = state.positions[i]
                 self.extractIconAt(state, dest, x, y, i)
              
                 if (flags & DMILoadFlags.NoPostProcessing) == 0:
@@ -313,7 +318,7 @@ state = "void2"
                 _y = y + (sy * self.ih)
                 try:
                     pixel = self.pixels[_x, _y]
-                    if pixel[3]==0: continue
+                    if pixel[3] == 0: continue
                     newpix[x, y] = pixel
                 except IndexError as e:
                     print("!!! Received IndexError in %s <%d,%d> = <%d,%d> + (<%d,%d> * <%d,%d>), max=<%d,%d> halting." % (self.filename, _x, _y, x, y, sx, sy, self.iw, self.ih, self.max_x, self.max_y))
@@ -331,7 +336,7 @@ state = "void2"
         if not os.path.isdir(outfolder):
             print('\tMKDIR ' + outfolder)
             os.makedirs(outfolder)
-        nfn = "{}[{}].png".format(state.name,i)
+        nfn = "{}[{}].png".format(state.name, i)
         valid_chars = "-_.()[] %s%s" % (string.ascii_letters, string.digits)
         nfn = ''.join(c for c in nfn if c in valid_chars)
         nfn = os.path.join(outfolder, nfn)
