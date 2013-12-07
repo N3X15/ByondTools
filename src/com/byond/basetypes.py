@@ -3,7 +3,7 @@ Created on Nov 6, 2013
 
 @author: Rob
 '''
-import logging
+#import logging
 AREA_LAYER = 1
 TURF_LAYER = 2
 OBJ_LAYER = 3

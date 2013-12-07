@@ -331,18 +331,11 @@ class Map:
                 t.origID = self.consumeTileID(line)
                 t.data = self.consumeTileAtoms(line.strip()[line.index('(') + 1:-1], lineNumber)
                 t.ID = index
-                # if line.startswith('"aav"'):
-                #    print(t.__str__(True))
-                # t = self.cleanTile(t)
                 tid = self.getTileTypeID(t)
-                # if line.startswith('"aav"'):
-                #    print(repr(tid))
                 if tid == None:
                     self.tileTypes += [t]
                     self.idlen = max(self.idlen, len(t.ID2String()))
                     self.oldID2NewID[t.origID] = t.ID
-                    # if line.startswith('"aav"'):
-                    #    print(t.origID)
                     index += 1
                     if((index % 100) == 0):
                         print(index)
@@ -360,6 +353,7 @@ class Map:
             if tile == t:
                 return tile.ID
         return None
+    
     def consumeTileID(self, line):
         e = line.index('"', 1)
         return line[1:e]
