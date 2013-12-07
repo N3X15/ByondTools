@@ -171,6 +171,15 @@ class DMI:
         #if self.dest is None:
         #    suppress_post_process = True
         self.img = Image.open(self.filename)
+        
+        # This is a stupid hack to work around BYOND generating indexed PNGs with unspecified transparency.
+        # Uncorrected, this will result in PIL(low) trying to read the colors as alpha.
+        if self.img.mode == 'P':
+            if 'transparency' not in self.img.info:
+                print('WARNING ({0}): Indexed PNG does not specify transparency! Setting black as transparency. self.img.info = {1}'.format(self.filename, repr(self.img.info)))
+                self.img.info['transparency'] = self.img.palette.getcolor((0, 0, 0))
+                self.img.save(self.filename+"(RENDER).png",'PNG')
+            self.img = self.img.convert('RGBA')
         self.size = self.img.size
         # print(repr(img.info))
         if(b'Description' not in self.img.info):
@@ -296,13 +305,16 @@ state = "void2"
             raise SystemError('Image is {}x{}, an invalid size.'.format(self.ih, self.iw))
         # print("  X (%d,%d)"%(sx*self.iw,sy*self.ih))
         icon = Image.new(self.img.mode, (self.iw, self.ih))
+        
         newpix = icon.load()
         for y in range(self.ih):
             for x in range(self.iw):
                 _x = x + (sx * self.iw)
                 _y = y + (sy * self.ih)
                 try:
-                    newpix[x, y] = self.pixels[_x, _y]
+                    pixel = self.pixels[_x, _y]
+                    if pixel[3]==0: continue
+                    newpix[x, y] = pixel
                 except IndexError as e:
                     print("!!! Received IndexError in %s <%d,%d> = <%d,%d> + (<%d,%d> * <%d,%d>), max=<%d,%d> halting." % (self.filename, _x, _y, x, y, sx, sy, self.iw, self.ih, self.max_x, self.max_y))
                     print('%s: {sz: %s,h: %d, w: %d, m_x: %d, m_y: %d}' % (self.filename, repr(self.img.size), self.ih, self.iw, self.max_x, self.max_y))

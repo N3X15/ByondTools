@@ -205,6 +205,7 @@ class Map:
             
     def generateImage(self, filename_tpl, basedir='.'):
         icons = {}
+        dmis = {}
         print('--- Generating texture atlas...')
         for tid in xrange(len(self.tileTypes)):
             tile = self.tileTypes[tid]
@@ -245,13 +246,19 @@ class Map:
                 
                 icon_key = '{0}:{1}[{2}]'.format(dmi_file, state, direction)
                 if icon_key not in icons:
+                    dmi_path=os.path.join(basedir, dmi_file)
                     dmi = None
-                    try:
-                        dmi = self.loadDMI(os.path.join(basedir, dmi_file))
-                    except Exception:
-                        for prop in ['icon', 'icon_state', 'dir']:
-                            print('\t{0}'.format(atom.dumpPropInfo(prop)))
-                        pass
+                    if dmi_path in dmis:
+                        dmi=dmis[dmi_path]
+                    else:
+                        try:
+                            dmi = self.loadDMI(dmi_path)
+                            dmis[dmi_path]=dmi
+                        except Exception as e:
+                            print(str(e))
+                            for prop in ['icon', 'icon_state', 'dir']:
+                                print('\t{0}'.format(atom.dumpPropInfo(prop)))
+                            pass
                     
                     if dmi.img.mode not in ('RGBA', 'P'):
                         print('WARNING: {} is mode {}!'.format(dmi_file, dmi.img.mode))
@@ -267,12 +274,6 @@ class Map:
                     
                     if frame == None:
                         continue
-                    
-                    # This is a stupid hack to work around BYOND generating indexed PNGs with unspecified transparency.
-                    # Uncorrected, this will result in PIL(low) trying to read the colors as alpha.
-                    if frame.mode == 'P' and 'transparency' not in frame.info:
-                        print('WARNING ({0}): Indexed PNG does not specify transparency! Setting black as transparency. frame.info = {1}'.format(icon_key, repr(frame.info)))
-                        frame.info['transparency'] = frame.palette.getcolor((0, 0, 0))
                     
                     if frame.mode != 'RGBA':
                         frame = frame.convert("RGBA")
