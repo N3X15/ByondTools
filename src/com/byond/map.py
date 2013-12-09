@@ -3,7 +3,7 @@ from com.byond.DMI import DMI
 from com.byond.directions import SOUTH, IMAGE_INDICES
 from com.byond.basetypes import Atom, BYONDString, BYONDValue, BYONDFileRef
 # from com.byond.objtree import ObjectTree
-from PIL import Image, PngImagePlugin
+from PIL import Image, PngImagePlugin, ImageChops
 
 ID_ENCODING_TABLE = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
         
@@ -21,6 +21,15 @@ def chunker(iterable, chunksize):
         if not wrapped_chunk[0]:
             break
         yield wrapped_chunk.pop()
+
+# From StackOverflow
+def trim(im):
+    bg = Image.new(im.mode, im.size, im.getpixel((0,0)))
+    diff = ImageChops.difference(im, bg)
+    diff = ImageChops.add(diff, diff, 2.0, -100)
+    bbox = diff.getbbox()
+    if bbox:
+        return im.crop(bbox)
 
 class Tile:
     FLAG_USE_OLD_ID = 1
@@ -134,7 +143,7 @@ class Map:
         
     def readMap(self, filename):
         if not os.path.isfile(filename):
-            print('File '+filename+" does not exist.")
+            print('File ' + filename + " does not exist.")
         self.filename = filename
         with open(filename, 'r') as f:
             print('--- Reading tile types from {0}...'.format(self.filename))
@@ -208,20 +217,19 @@ class Map:
                     x += 1
                 y += 1
                 
-            
     def generateImage(self, filename_tpl, basedir='.', renderflags=0, **kwargs):
         icons = {}
         dmis = {}
-        area=None
+        area = None
         if 'area' in kwargs:
-            area=kwargs['area']
-            print('area = '+repr(area))
+            area = kwargs['area']
+            print('area = ' + repr(area))
         print('--- Generating texture atlas...')
         for tid in xrange(len(self.tileTypes)):
             tile = self.tileTypes[tid]
             img = Image.new('RGBA', (96, 96))
             tile.offset = (32, 32)
-            tile.areaSelected=True
+            tile.areaSelected = True
             for atom in sorted(tile.data, reverse=True):
                 
                 aid = tile.data.index(atom)
@@ -229,7 +237,7 @@ class Map:
                 if atom.path.startswith('/area'):
                     if area is not None:
                         if area != atom.path:
-                            tile.areaSelected=False
+                            tile.areaSelected = False
                             # Not in a desired area, bail.
                             break
                     if not (renderflags & MapRenderFlags.RENDER_AREAS):
@@ -264,14 +272,14 @@ class Map:
                 
                 icon_key = '{0}:{1}[{2}]'.format(dmi_file, state, direction)
                 if icon_key not in icons:
-                    dmi_path=os.path.join(basedir, dmi_file)
+                    dmi_path = os.path.join(basedir, dmi_file)
                     dmi = None
                     if dmi_path in dmis:
-                        dmi=dmis[dmi_path]
+                        dmi = dmis[dmi_path]
                     else:
                         try:
                             dmi = self.loadDMI(dmi_path)
-                            dmis[dmi_path]=dmi
+                            dmis[dmi_path] = dmi
                         except Exception as e:
                             print(str(e))
                             for prop in ['icon', 'icon_state', 'dir']:
@@ -324,11 +332,12 @@ class Map:
                         y_o = 32 - tile.frame.size[1]  # BYOND uses LOWER left as origin for some fucking reason
                         zpic.paste(tile.frame, ((x * 32) + x_o + tile.offset[0], (y * 32) + y_o + tile.offset[1], (x * 32) + tile.frame.size[0] + x_o + tile.offset[0], (y * 32) + tile.frame.size[0] + y_o + tile.offset[1]), tile.frame)
                         
-            #Autocrop (only works if NOT rendering stars)
-            zpic=zpic.crop(zpic.getbbox())
+            # Autocrop (only works if NOT rendering stars)
+            zpic = trim(zpic)
             
-            # Saev
-            zpic.save(filename, 'PNG')
+            if zpic is not None:
+                # Saev
+                zpic.save(filename, 'PNG')
         
             
     def loadDMI(self, filename):
