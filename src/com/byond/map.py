@@ -105,6 +105,10 @@ class MapLayer:
         # print(repr(self.tiles))
         return self.map.tileTypes[self.tiles[y][x]]
     
+class MapRenderFlags:
+    RENDER_STARS = 1
+    RENDER_AREAS = 2
+    
 class Map:
     WRITE_OLD_IDS = 1
     def __init__(self, tree=None):
@@ -129,9 +133,11 @@ class Map:
         self.atomBorders = nit
         
     def readMap(self, filename):
+        if not os.path.isfile(filename):
+            print('File '+filename+" does not exist.")
         self.filename = filename
         with open(filename, 'r') as f:
-            print('--- Reading tile types...')
+            print('--- Reading tile types from {0}...'.format(self.filename))
             self.consumeTiles(f)
             print('--- Reading tile positions...')
             self.consumeTileMap(f)
@@ -203,24 +209,36 @@ class Map:
                 y += 1
                 
             
-    def generateImage(self, filename_tpl, basedir='.'):
+    def generateImage(self, filename_tpl, basedir='.', renderflags=0, **kwargs):
         icons = {}
         dmis = {}
+        area=None
+        if 'area' in kwargs:
+            area=kwargs['area']
+            print('area = '+repr(area))
         print('--- Generating texture atlas...')
         for tid in xrange(len(self.tileTypes)):
             tile = self.tileTypes[tid]
             img = Image.new('RGBA', (96, 96))
             tile.offset = (32, 32)
+            tile.areaSelected=True
             for atom in sorted(tile.data, reverse=True):
                 
                 aid = tile.data.index(atom)
                 # Ignore /areas.  They look like ass.
                 if atom.path.startswith('/area'):
-                    continue
+                    if area is not None:
+                        if area != atom.path:
+                            tile.areaSelected=False
+                            # Not in a desired area, bail.
+                            break
+                    if not (renderflags & MapRenderFlags.RENDER_AREAS):
+                        continue
                 
                 # We're going to turn space black for smaller images.
                 if atom.path == '/turf/space':
-                    continue
+                    if not (renderflags & MapRenderFlags.RENDER_STARS):
+                        continue
                     
                 if 'icon' not in atom.properties:
                     print('CRITICAL: UNKNOWN ICON IN {0} (atom #{1})'.format(tile.origID, aid))
@@ -299,9 +317,17 @@ class Map:
                 for x in xrange(self.zLevels[z].width):
                     tile = self.zLevels[z].GetTileAt(x, y)
                     if tile is not None:
+                        if not tile.areaSelected:
+                            # Skip it.
+                            continue
                         x_o = 0
                         y_o = 32 - tile.frame.size[1]  # BYOND uses LOWER left as origin for some fucking reason
                         zpic.paste(tile.frame, ((x * 32) + x_o + tile.offset[0], (y * 32) + y_o + tile.offset[1], (x * 32) + tile.frame.size[0] + x_o + tile.offset[0], (y * 32) + tile.frame.size[0] + y_o + tile.offset[1]), tile.frame)
+                        
+            #Autocrop (only works if NOT rendering stars)
+            zpic=zpic.crop(zpic.getbbox())
+            
+            # Saev
             zpic.save(filename, 'PNG')
         
             

@@ -1,12 +1,11 @@
-import os, sys, re
-from com.byond.objtree import *
-import com.byond.map as byond_map
-from com.byond import GetFilesFromDME
+import os, sys, argparse
+from com.byond.objtree import ObjectTree
+from com.byond.map import Map, Tile, MapRenderFlags
 """
 Usage:
     $ python generateMap.py path/to/your/project.dme path/to/your/map.dmm
 
-calculateMaxTechLevels.py - Get techlevels of all objects and generate reports. 
+generateMap.py - Creates an image of a DMM map.
 
 Copyright 2013 Rob "N3X15" Nelson <nexis@7chan.org>
 
@@ -30,15 +29,28 @@ THE SOFTWARE.
 
 """
 
-if os.path.isfile(sys.argv[1]):
-    selectedDMEs = []
+opt = argparse.ArgumentParser()
+opt.add_argument('project', metavar="project.dme")
+opt.add_argument('map', metavar="map.dmm")
+opt.add_argument('--render-stars', dest='render_stars', default=False, action='store_true', help="Render space.  Normally off to prevent ballooning the image size.")
+opt.add_argument('--render-areas', dest='render_areas', default=False, action='store_true', help="Render area overlays.")
+opt.add_argument('--area', dest='area', type=str, default=None, help="Specify an area to restrict rendering to.")
+args = opt.parse_args()
+if os.path.isfile(args.project):
     tree = ObjectTree()
-    tree.ProcessFilesFromDME(sys.argv[1])
-    path2name={}
-    dmm = byond_map.Map(tree)
-    dmm.readMap(sys.argv[2])
-    dmm.generateImage(sys.argv[2]+'.{z}.png',os.path.dirname(sys.argv[1]))
+    tree.ProcessFilesFromDME(args.project)
+    dmm = Map(tree)
+    dmm.readMap(args.map)
+    renderflags = 0
+    if args.render_stars:
+        renderflags |= MapRenderFlags.RENDER_STARS
+    if args.render_areas:
+        renderflags |= MapRenderFlags.RENDER_AREAS
+    kwargs = {}
+    if args.area:
+        kwargs['area'] = args.area
+    dmm.generateImage(args.map + '.{z}.png', os.path.dirname(args.project), renderflags, **kwargs)
     
-    with open(sys.argv[2]+'.types','w') as f:
-        for tile in dmm.tileTypes:
-            f.write(tile.MapSerialize(byond_map.Tile.FLAG_INHERITED_PROPERTIES|byond_map.Tile.FLAG_USE_OLD_ID)+'\n')
+    # with open(sys.argv[2]+'.types','w') as f:
+    #    for tile in dmm.tileTypes:
+    #        f.write(tile.MapSerialize(Tile.FLAG_INHERITED_PROPERTIES|Tile.FLAG_USE_OLD_ID)+'\n')

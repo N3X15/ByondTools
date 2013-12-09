@@ -47,12 +47,6 @@ def main():
 	_set_dmi_data = command.add_parser('set-dmi-data', help='Set DMI header')
 	_set_dmi_data.add_argument('file', type=str, help='One side of the difference', metavar='file.dmi')
 	_set_dmi_data.add_argument('metadata', type=str, help='DMI header file', metavar='metadata.txt')
-	"""
-	opt.add_argument('-d', '--disassemble',		dest='disassemble', 	type=str, nargs=2, action=ModeAction, help='Disassemble a single .dmi file to a destination.', metavar='file.dmi dest/')
-	opt.add_argument('-D', '--disassemble-all',	dest='disassemble_all', type=str, nargs=2, action=ModeAction, help='Disassemble a directory of DMI files recursively to a destination.', metavar='dmi_files/ dest/')
-	opt.add_argument('-c', '--compile', 		dest='make_dmi',		type=str, nargs=2, action=ModeAction, help='Compile a .dmi.mak file to a DMI.', metavar='my.dmi.mak my.dmi')
-	opt.add_argument('-c', '--compile', 		dest='make_dmi',		type=str, nargs=2, action=ModeAction, help='Compile a .dmi.mak file to a DMI.', metavar='my.dmi.mak my.dmi')
-	"""
 	
 	args = opt.parse_args()
 	print(args)
