@@ -33,7 +33,7 @@ def renderMap(args):
     outfile=args.map+'.{z}.png'
     if args.area:
         kwargs['area'] = args.area
-        outfile=args.area.replace('/','_')+'.png'
+        outfile=args.area[0].replace('/','_')+'.png'
     if args.outfile:
         outfile=args.outfile
     dmm.generateImage(outfile, os.path.dirname(args.project), renderflags, **kwargs)
@@ -43,7 +43,7 @@ opt.add_argument('project', metavar="project.dme")
 opt.add_argument('map', metavar="map.dmm")
 opt.add_argument('--render-stars', dest='render_stars', default=False, action='store_true', help="Render space.  Normally off to prevent ballooning the image size.")
 opt.add_argument('--render-areas', dest='render_areas', default=False, action='store_true', help="Render area overlays.")
-opt.add_argument('--area', dest='area', type=str, default=None, help="Specify an area to restrict rendering to.")
+opt.add_argument('--area', dest='area', type=list, nargs='*', default=None, help="Specify an area to restrict rendering to.")
 opt.add_argument('--out',dest='outfile',type=str, default=None, help="What to name the file ({z} will be replaced with z-level)")
 opt.add_argument('--area-list',dest='areas',type=str, default=None, help="A file with area_file.png = /area/path on each line")
 args = opt.parse_args()
@@ -66,8 +66,8 @@ if os.path.isfile(args.project):
                 if '=' not in line:
                     continue
                 outfile,area = line.split('=')
-                args.area=area
-                args.outfile=outfile
+                args.area=area.strip().split(',')
+                args.outfile=outfile.strip()
                 renderMap(args)
     else:
         renderMap(args)

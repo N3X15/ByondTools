@@ -24,7 +24,7 @@ def chunker(iterable, chunksize):
 
 # From StackOverflow
 def trim(im):
-    bg = Image.new(im.mode, im.size, im.getpixel((0,0)))
+    bg = Image.new(im.mode, im.size, im.getpixel((0, 0)))
     diff = ImageChops.difference(im, bg)
     diff = ImageChops.add(diff, diff, 2.0, -100)
     bbox = diff.getbbox()
@@ -129,6 +129,8 @@ class Map:
         self.height = 0
         self.idlen = 0
         self.tree = tree
+        self.generatedTexAtlas = False
+        self.selectedAreas = ()
     
         self.atomBorders = {
             '{':'}',
@@ -217,14 +219,13 @@ class Map:
                     x += 1
                 y += 1
                 
-    def generateImage(self, filename_tpl, basedir='.', renderflags=0, **kwargs):
-        icons = {}
-        dmis = {}
-        area = None
-        if 'area' in kwargs:
-            area = kwargs['area']
-            print('area = ' + repr(area))
+    def generateTexAtlas(self, basedir, renderflags=0):
+        if self.generatedTexAtlas:
+            return
         print('--- Generating texture atlas...')
+        self._icons = {}
+        self._dmis = {}
+        self.generatedTexAtlas = True
         for tid in xrange(len(self.tileTypes)):
             tile = self.tileTypes[tid]
             img = Image.new('RGBA', (96, 96))
@@ -235,11 +236,6 @@ class Map:
                 aid = tile.data.index(atom)
                 # Ignore /areas.  They look like ass.
                 if atom.path.startswith('/area'):
-                    if area is not None:
-                        if area != atom.path:
-                            tile.areaSelected = False
-                            # Not in a desired area, bail.
-                            break
                     if not (renderflags & MapRenderFlags.RENDER_AREAS):
                         continue
                 
@@ -271,15 +267,20 @@ class Map:
                         continue
                 
                 icon_key = '{0}:{1}[{2}]'.format(dmi_file, state, direction)
-                if icon_key not in icons:
+                frame = None
+                pixel_x = 0
+                pixel_y = 0
+                if icon_key in self._icons:
+                    frame, pixel_x, pixel_y = self._icons[icon_key]
+                else:
                     dmi_path = os.path.join(basedir, dmi_file)
                     dmi = None
-                    if dmi_path in dmis:
-                        dmi = dmis[dmi_path]
+                    if dmi_path in self._dmis:
+                        dmi = self._dmis[dmi_path]
                     else:
                         try:
                             dmi = self.loadDMI(dmi_path)
-                            dmis[dmi_path] = dmi
+                            self._dmis[dmi_path] = dmi
                         except Exception as e:
                             print(str(e))
                             for prop in ['icon', 'icon_state', 'dir']:
@@ -312,31 +313,81 @@ class Map:
                     if 'pixel_y' in atom.properties:
                         pixel_y = int(atom.properties['pixel_y'].value)
                         
-                    img.paste(frame, (32 + pixel_x, 32 - pixel_y), frame)  # Add to the top of the stack.
+                    self._icons[icon_key] = (frame, pixel_x, pixel_y)
+                img.paste(frame, (32 + pixel_x, 32 - pixel_y), frame)  # Add to the top of the stack.
+            
             tile.frame = img
+            # Fade out unselected tiles.
+            bands = list(img.split())
+            # Excluding alpha band
+            for i in range(3):
+                bands[i] = bands[i].point(lambda x: x * 0.4)
+            tile.unselected_frame = Image.merge(img.mode, bands)
+            
+            self.tileTypes[tid] = tile
+                
+    def generateImage(self, filename_tpl, basedir='.', renderflags=0, **kwargs):
+        self.selectedAreas = ()
+        if 'area' in kwargs:
+            self.selectedAreas = kwargs['area']
+            print('area = ' + repr(self.selectedAreas))
+        
+        self.generateTexAtlas(basedir, renderflags)
+        
+        for tid in xrange(len(self.tileTypes)):
+            tile = self.tileTypes[tid]
+            tile.areaSelected = True
+            for atom in tile.data:
+                if atom.path.startswith('/area'):
+                    if atom.path not in self.selectedAreas:
+                        tile.areaSelected = False
+                        break
             self.tileTypes[tid] = tile
             
         print('--- Creating maps...')
         for z in self.zLevels.keys():
+            bbox = [99999, 99999, 0, 0]
             filename = filename_tpl.replace('{z}', str(z))
-            print(' -> {} ({}x{})'.format(filename, (self.zLevels[z].height + 2) * 32, (self.zLevels[z].width + 2) * 32))
+            print('Checking z-level {0}...'.format(z))
             zpic = Image.new('RGBA', ((self.zLevels[z].width + 2) * 32, (self.zLevels[z].height + 2) * 32), "black")
+            nSelAreas = 0
             for y in xrange(self.zLevels[z].height):
                 for x in xrange(self.zLevels[z].width):
                     tile = self.zLevels[z].GetTileAt(x, y)
                     if tile is not None:
-                        if not tile.areaSelected:
-                            # Skip it.
-                            continue
                         x_o = 0
                         y_o = 32 - tile.frame.size[1]  # BYOND uses LOWER left as origin for some fucking reason
-                        zpic.paste(tile.frame, ((x * 32) + x_o + tile.offset[0], (y * 32) + y_o + tile.offset[1], (x * 32) + tile.frame.size[0] + x_o + tile.offset[0], (y * 32) + tile.frame.size[0] + y_o + tile.offset[1]), tile.frame)
-                        
-            # Autocrop (only works if NOT rendering stars)
-            zpic = trim(zpic)
+                        new_bb = ((x * 32) + x_o + tile.offset[0], (y * 32) + y_o + tile.offset[1], (x * 32) + tile.frame.size[0] + x_o + tile.offset[0], (y * 32) + tile.frame.size[0] + y_o + tile.offset[1])
+                        frame = tile.frame
+                        if tile.areaSelected:
+                            # Adjust cropping bounds 
+                            if new_bb[0] < bbox[0]:
+                                bbox[0] = new_bb[0]
+                            if new_bb[1] < bbox[1]:
+                                bbox[1] = new_bb[1]
+                            if new_bb[2] > bbox[2]:
+                                bbox[2] = new_bb[2]
+                            if new_bb[3] > bbox[3]:
+                                bbox[3] = new_bb[3]
+                            nSelAreas += 1
+                        else:
+                            frame = tile.unselected_frame
+                        zpic.paste(frame, new_bb, frame)
+            
+            if len(self.selectedAreas) == 0:            
+                # Autocrop (only works if NOT rendering stars or areas)
+                zpic = trim(zpic)
+            else:
+                if nSelAreas == 0:
+                    continue
+                zpic = zpic.crop(bbox)
             
             if zpic is not None:
                 # Saev
+                filedir = os.path.dirname(filename)
+                if not os.path.isdir(filedir):
+                    os.makedirs(filedir)
+                print(' -> {} ({}x{})'.format(filename, zpic.size[0], zpic.size[1]))
                 zpic.save(filename, 'PNG')
             
     def loadDMI(self, filename):
