@@ -1,6 +1,6 @@
-import os, sys, argparse
+import os, argparse
 from com.byond.objtree import ObjectTree
-from com.byond.map import Map, Tile, MapRenderFlags
+from com.byond.map import Map, MapRenderFlags
 """
 Usage:
     $ python generateMap.py path/to/your/project.dme path/to/your/map.dmm
@@ -35,6 +35,7 @@ opt.add_argument('map', metavar="map.dmm")
 opt.add_argument('--render-stars', dest='render_stars', default=False, action='store_true', help="Render space.  Normally off to prevent ballooning the image size.")
 opt.add_argument('--render-areas', dest='render_areas', default=False, action='store_true', help="Render area overlays.")
 opt.add_argument('--area', dest='area', type=str, default=None, help="Specify an area to restrict rendering to.")
+opt.add_argument('--out',dest='outfile',type=str, default=None, help="What to name the file ({z} will be replaced with z-level)")
 args = opt.parse_args()
 if os.path.isfile(args.project):
     tree = ObjectTree()
@@ -47,9 +48,13 @@ if os.path.isfile(args.project):
     if args.render_areas:
         renderflags |= MapRenderFlags.RENDER_AREAS
     kwargs = {}
+    outfile=args.map+'.{z}.png'
     if args.area:
         kwargs['area'] = args.area
-    dmm.generateImage(args.map + '.{z}.png', os.path.dirname(args.project), renderflags, **kwargs)
+        outfile=args.area.replace('/','_')+'.png'
+    if args.outfile:
+        outfile=args.outfile
+    dmm.generateImage(outfile, os.path.dirname(args.project), renderflags, **kwargs)
     
     # with open(sys.argv[2]+'.types','w') as f:
     #    for tile in dmm.tileTypes:

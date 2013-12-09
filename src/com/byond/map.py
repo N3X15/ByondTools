@@ -338,7 +338,6 @@ class Map:
             if zpic is not None:
                 # Saev
                 zpic.save(filename, 'PNG')
-        
             
     def loadDMI(self, filename):
         if filename not in self.DMIs:
