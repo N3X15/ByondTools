@@ -288,7 +288,7 @@ state = "void2"
                 y += 1
             
     def extractAllStates(self, dest, flags=0):
-        for name, state in self.states.iteritems():
+        for _, state in self.states.iteritems():
             # state = State()
             for i in xrange(len(state.positions)):
                 x, y = state.positions[i]
@@ -320,7 +320,7 @@ state = "void2"
                     pixel = self.pixels[_x, _y]
                     if pixel[3] == 0: continue
                     newpix[x, y] = pixel
-                except IndexError as e:
+                except IndexError:
                     print("!!! Received IndexError in %s <%d,%d> = <%d,%d> + (<%d,%d> * <%d,%d>), max=<%d,%d> halting." % (self.filename, _x, _y, x, y, sx, sy, self.iw, self.ih, self.max_x, self.max_y))
                     print('%s: {sz: %s,h: %d, w: %d, m_x: %d, m_y: %d}' % (self.filename, repr(self.img.size), self.ih, self.iw, self.max_x, self.max_y))
                     print('# of cells: %d' % len(self.states))

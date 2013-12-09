@@ -26,22 +26,22 @@ IMAGE_INDICES=[
 def getDirFromName(name):
     return getattr(sys.modules[__name__],name,None)
 
-def getNameFromDir(dir):
-    if dir == NORTH:
+def getNameFromDir(_dir):
+    if _dir == NORTH:
         return 'NORTH'
-    elif dir == SOUTH:
+    elif _dir == SOUTH:
         return 'SOUTH'
-    elif dir == EAST:
+    elif _dir == EAST:
         return 'EAST'
-    elif dir == WEST:
+    elif _dir == WEST:
         return 'WEST'
-    elif dir == (NORTH|WEST):
+    elif _dir == (NORTH|WEST):
         return 'NORTHWEST'
-    elif dir == (NORTH|EAST):
+    elif _dir == (NORTH|EAST):
         return 'NORTHEAST'
-    elif dir == (SOUTH|EAST):
+    elif _dir == (SOUTH|EAST):
         return 'SOUTHEAST'
-    elif dir == (SOUTH|WEST):
+    elif _dir == (SOUTH|WEST):
         return 'SOUTHWEST'
     else:
-        return 'UNKNOWN (%d)' %dir
+        return 'UNKNOWN (%d)' %_dir

@@ -3,7 +3,7 @@ from com.byond.DMI import DMI
 from com.byond.directions import SOUTH, IMAGE_INDICES
 from com.byond.basetypes import Atom, BYONDString, BYONDValue, BYONDFileRef
 # from com.byond.objtree import ObjectTree
-from PIL import Image, PngImagePlugin, ImageChops
+from PIL import Image, ImageChops
 
 ID_ENCODING_TABLE = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
         
