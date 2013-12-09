@@ -28,6 +28,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 """
+                
+def renderMap(args):
+    outfile=args.map+'.{z}.png'
+    if args.area:
+        kwargs['area'] = args.area
+        outfile=args.area.replace('/','_')+'.png'
+    if args.outfile:
+        outfile=args.outfile
+    dmm.generateImage(outfile, os.path.dirname(args.project), renderflags, **kwargs)
 
 opt = argparse.ArgumentParser()
 opt.add_argument('project', metavar="project.dme")
@@ -36,6 +45,7 @@ opt.add_argument('--render-stars', dest='render_stars', default=False, action='s
 opt.add_argument('--render-areas', dest='render_areas', default=False, action='store_true', help="Render area overlays.")
 opt.add_argument('--area', dest='area', type=str, default=None, help="Specify an area to restrict rendering to.")
 opt.add_argument('--out',dest='outfile',type=str, default=None, help="What to name the file ({z} will be replaced with z-level)")
+opt.add_argument('--area-list',dest='areas',type=str, default=None, help="A file with area_file.png = /area/path on each line")
 args = opt.parse_args()
 if os.path.isfile(args.project):
     tree = ObjectTree()
@@ -48,13 +58,19 @@ if os.path.isfile(args.project):
     if args.render_areas:
         renderflags |= MapRenderFlags.RENDER_AREAS
     kwargs = {}
-    outfile=args.map+'.{z}.png'
-    if args.area:
-        kwargs['area'] = args.area
-        outfile=args.area.replace('/','_')+'.png'
-    if args.outfile:
-        outfile=args.outfile
-    dmm.generateImage(outfile, os.path.dirname(args.project), renderflags, **kwargs)
+    if args.areas:
+        with open(args.areas) as f:
+            for line in f:
+                if line.startswith("#"):
+                    continue
+                if '=' not in line:
+                    continue
+                outfile,area = line.split('=')
+                args.area=area
+                args.outfile=outfile
+                renderMap(args)
+    else:
+        renderMap(args)
     
     # with open(sys.argv[2]+'.types','w') as f:
     #    for tile in dmm.tileTypes:
