@@ -122,13 +122,15 @@ def compare(theirsfile, minefile, parser, reportstream):
 	mine = []
 	mineDMI=None
 	states = []
-	new2mine = DMI(minefile.replace('.dmi','.new.dmi'))
+	
+	new2mineFilename=minefile.replace('.dmi','.new.dmi')
+	new2mine = DMI(new2mineFilename)
 	
 	o = ''
 	if(os.path.isfile(theirsfile)):
 		try:
 			theirsDMI = DMI(theirsfile)
-			theirsDMI.loadMetadata()
+			theirsDMI.loadAll()
 			theirs = theirsDMI.states
 		except SystemError as e:
 			print("!!! Received SystemError in %s, halting: %s" % (theirs.filename, traceback.format_exc(e)))
@@ -173,12 +175,20 @@ def compare(theirsfile, minefile, parser, reportstream):
 		reportstream.write('\n--- {0}'.format(theirsfile))
 		reportstream.write('\n+++ {0}'.format(minefile))
 		reportstream.write(o)
-		if len(new2mine.states)>0:
-			new2mine.save(minefile.replace('.dmi','.new.dmi'))
+		#if len(new2mine.states)>0:
+		#	new2mine.save(new2mineFilename)
+		#else:
+		#	if os.path.isfile(new2mineFilename):
+		#		os.remove(new2mineFilename)
 	
 
 def disassemble_all(in_dir, out_dir, parser):
 	print('D_A %s -> %s' % (in_dir, out_dir))
+	for root, dirnames, filenames in os.walk(out_dir):
+		for filename in fnmatch.filter(filenames, '*.new.dmi'):
+			path = os.path.join(root, filename)
+			print('RM {0}'.format(path))
+			os.remove(path)
 	for root, dirnames, filenames in os.walk(in_dir):
 		for filename in fnmatch.filter(filenames, '*.dmi'):
 			path = os.path.join(root, filename)

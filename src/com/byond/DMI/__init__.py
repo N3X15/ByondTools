@@ -54,16 +54,23 @@ class DMI:
                         self.states[name] = dmi.states[name]
                         
     def save(self, to):
+        if len(self.states)==0:
+            return # Nope.
         # Now build the manifest
-        manifest = 'version = 4.0'
-        manifest += '\r\n        width = {0}'.format(self.iw)
-        manifest += '\r\n        height = {0}'.format(self.ih)
+        manifest = '#BEGIN DMI'
+        manifest += '\nversion = 4.0'
+        manifest += '\n\twidth = {0}'.format(self.iw)
+        manifest += '\n\theight = {0}'.format(self.ih)
         
         frames = []
         # Sort by name because I'm autistic like that.
         for name in sorted(self.states):
-            manifest += self.states[name].genManifest()
-            frames += self.states[name].icons
+            if len(self.states[name].icons)>0:
+                manifest += self.states[name].genManifest()
+                frames += self.states[name].icons
+            else:
+                print('WARNING: State {0} has 0 icons.'.format(name))
+        manifest += '\n#END DMI'
             
         # Next bit borrowed from DMIDE.
         icons_per_row = math.ceil(math.sqrt(len(frames)))
@@ -77,9 +84,10 @@ class DMI:
         x = 0
         y = 0
         for frame in frames:
-            # print(frame)
-            icon = Image.open(frame, 'r')
-            sheet.paste(icon, (x * self.iw, y * self.ih))
+            icon=frame
+            if isinstance(frame,str):
+                icon = Image.open(frame, 'r')
+            sheet.paste(icon, (x * self.iw, y * self.ih), icon)
             x += 1
             if x > icons_per_row:
                 y += 1
@@ -100,7 +108,8 @@ class DMI:
 
         # and save
         sheet.save(to, 'PNG', pnginfo=meta)
-        
+        #with open(to+'.txt','w') as f:
+        #    f.write(manifest)
         print('>>> {0} states saved to {1}'.format(len(frames), to))
 
     def getDMIH(self):
@@ -133,6 +142,11 @@ class DMI:
         if state not in self.states:
             return None
         return self.states[state].getFrame(direction, frame)
+    
+    def setFrame(self, state, direction, frame, img):
+        if state not in self.states:
+            self.states[state] = State(state)
+        return self.states[state].setFrame(direction, frame)
     
     def getHeader(self):
         img = Image.open(self.filename)
@@ -176,7 +190,7 @@ class DMI:
             # If there's no transparency, set it to black.
             if 'transparency' not in self.img.info:
                 print('WARNING ({0}): Indexed PNG does not specify transparency! Setting black as transparency. self.img.info = {1}'.format(self.filename, repr(self.img.info)))
-                self.img.info['transparency'] = self.img.palette.getcolor((0, 0, 0))
+                self.img.info['transparency'] = 0
                 
             # Always use RGBA, it causes less problems.
             self.img = self.img.convert('RGBA')

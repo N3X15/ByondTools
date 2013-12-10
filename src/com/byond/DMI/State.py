@@ -78,7 +78,7 @@ state = "void"
         if value != default:
             if type(value) is list:
                 value = ','.join(value)
-            return '\r\n        {0} = {1}'.format(name, value)
+            return '\n\t{0} = {1}'.format(name, value)
         return ''
     
     def ToString(self):
