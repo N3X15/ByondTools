@@ -118,8 +118,12 @@ def disassemble(path, to, parser):
 def compare(theirsfile, minefile, parser, reportstream):
 	#print('\tD %s -> %s' % (theirsfile, minefile))
 	theirs = []
+	theirsDMI=None
 	mine = []
+	mineDMI=None
 	states = []
+	new2mine = DMI()
+	
 	o = ''
 	if(os.path.isfile(theirsfile)):
 		try:
@@ -157,7 +161,8 @@ def compare(theirsfile, minefile, parser, reportstream):
 		inTheirs = state in theirs
 		inMine = state in mine 
 		if inTheirs and not inMine:
-			o += '\n + {1}'.format(minefile, state) 
+			o += '\n + {1}'.format(minefile, state)
+			new2mine.states[state]=theirsDMI.states[state]
 		elif not inTheirs and inMine:
 			o += '\n - {1}'.format(theirsfile, state)
 		elif inTheirs and inMine:
@@ -168,6 +173,8 @@ def compare(theirsfile, minefile, parser, reportstream):
 		reportstream.write('\n--- {0}'.format(theirsfile))
 		reportstream.write('\n+++ {0}'.format(minefile))
 		reportstream.write(o)
+		if len(new2mine.states)>0:
+			new2mine.save(minefile.replace('.dmi','.new.dmi'))
 	
 
 def disassemble_all(in_dir, out_dir, parser):
