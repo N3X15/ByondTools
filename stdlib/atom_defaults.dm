@@ -8,6 +8,7 @@
 	var/list/vars=list()
 	var/type=null
 	var/parent_type=null
+	var/layer=OBJ_LAYER
 
 /atom
 	var/list/contents=list() 
@@ -37,3 +38,16 @@
 	var/x=0 
 	var/y=0 
 	var/z=0 
+	
+	
+/turf
+	layer = TURF_LAYER
+	
+/area
+	layer = AREA_LAYER
+	
+/obj
+	layer = OBJ_LAYER
+	
+/obj
+	layer = MOB_LAYER

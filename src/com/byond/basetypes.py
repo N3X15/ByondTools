@@ -65,22 +65,6 @@ class Atom:
         self.filename = filename
         self.line = line
         
-        self.SetLayer()
-        
-    def SetLayer(self):
-        if 'layer' in self.properties:
-            return
-        if self.path.startswith('/turf'):
-            self.properties['layer'] = BYONDValue(TURF_LAYER)
-        elif self.path.startswith('/area'):
-            self.properties['layer'] = BYONDValue(AREA_LAYER)
-        elif self.path.startswith('/obj'):
-            self.properties['layer'] = BYONDValue(OBJ_LAYER)
-        elif self.path.startswith('/mob'):
-            self.properties['layer'] = BYONDValue(MOB_LAYER)
-        else:
-            self.properties['layer'] = BYONDValue(OBJ_LAYER)
-        
     def copy(self):
         new_node = Atom(self.path)
         new_node.properties = self.properties.copy()

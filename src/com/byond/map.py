@@ -570,7 +570,7 @@ class Map:
                 currentAtom.mapSpecified += [key]
                 
         # Compare to base
-        currentAtom.SetLayer()
+        #currentAtom.SetLayer()
         # currentAtom.mapSpecified = []
         base_atom = self.GetAtom(currentAtom.path)
         assert base_atom != None
