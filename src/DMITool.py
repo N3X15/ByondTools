@@ -122,7 +122,7 @@ def compare(theirsfile, minefile, parser, reportstream):
 	mine = []
 	mineDMI=None
 	states = []
-	new2mine = DMI()
+	new2mine = DMI(minefile.replace('.dmi','.new.dmi'))
 	
 	o = ''
 	if(os.path.isfile(theirsfile)):
