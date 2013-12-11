@@ -1,5 +1,5 @@
 '''
-Superficially generate an object/property tree
+Superficially generate an object/property tree.
 '''
 import re, logging, os
 from .basetypes import *

@@ -348,7 +348,6 @@ state = "void2"
         icon = self.loadIconAt(sx, sy)
         outfolder = os.path.join(dest, os.path.basename(self.filename))
         if not os.path.isdir(outfolder):
-            print('\tMKDIR ' + outfolder)
             os.makedirs(outfolder)
         nfn = "{}[{}].png".format(state.name, i)
         valid_chars = "-_.()[] %s%s" % (string.ascii_letters, string.digits)

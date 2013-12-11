@@ -40,6 +40,8 @@ class Tile:
         self.ID = 0
         self.data = []
         self.frame = None
+        self.unselected_frame = None
+        self.render_deferred = False
     
     def ID2String(self, pad=0):
         o = ''
@@ -231,6 +233,7 @@ class Map:
             img = Image.new('RGBA', (96, 96))
             tile.offset = (32, 32)
             tile.areaSelected = True
+            tile.render_deferred=False
             for atom in sorted(tile.data, reverse=True):
                 
                 aid = tile.data.index(atom)
@@ -315,8 +318,10 @@ class Map:
                         
                     self._icons[icon_key] = (frame, pixel_x, pixel_y)
                 img.paste(frame, (32 + pixel_x, 32 - pixel_y), frame)  # Add to the top of the stack.
-            
+                if pixel_x!=0 or pixel_y!=0:
+                    tile.render_deferred=True
             tile.frame = img
+            
             # Fade out unselected tiles.
             bands = list(img.split())
             # Excluding alpha band
@@ -346,33 +351,54 @@ class Map:
             
         print('--- Creating maps...')
         for z in self.zLevels.keys():
-            bbox = [99999, 99999, 0, 0]
-            filename = filename_tpl.replace('{z}', str(z))
             print('Checking z-level {0}...'.format(z))
-            zpic = Image.new('RGBA', ((self.zLevels[z].width + 2) * 32, (self.zLevels[z].height + 2) * 32), "black")
-            nSelAreas = 0
+            thingsToDo=0
             for y in xrange(self.zLevels[z].height):
                 for x in xrange(self.zLevels[z].width):
                     tile = self.zLevels[z].GetTileAt(x, y)
                     if tile is not None:
-                        x_o = 0
-                        y_o = 32 - tile.frame.size[1]  # BYOND uses LOWER left as origin for some fucking reason
-                        new_bb = ((x * 32) + x_o + tile.offset[0], (y * 32) + y_o + tile.offset[1], (x * 32) + tile.frame.size[0] + x_o + tile.offset[0], (y * 32) + tile.frame.size[0] + y_o + tile.offset[1])
-                        frame = tile.frame
                         if tile.areaSelected:
-                            # Adjust cropping bounds 
-                            if new_bb[0] < bbox[0]:
-                                bbox[0] = new_bb[0]
-                            if new_bb[1] < bbox[1]:
-                                bbox[1] = new_bb[1]
-                            if new_bb[2] > bbox[2]:
-                                bbox[2] = new_bb[2]
-                            if new_bb[3] > bbox[3]:
-                                bbox[3] = new_bb[3]
-                            nSelAreas += 1
-                        else:
-                            frame = tile.unselected_frame
-                        zpic.paste(frame, new_bb, frame)
+                            thingsToDo += 1
+            if thingsToDo==0:
+                print(' Nothing to do, skipping.') 
+                continue
+            
+            #Bounding box, used for cropping.
+            bbox = [99999, 99999, 0, 0]
+            
+            # Replace {z} with current z-level.
+            filename = filename_tpl.replace('{z}', str(z))
+            
+            # Leds do et!
+            # TODO: Only render tiles within the bounding box
+            zpic = Image.new('RGBA', ((self.zLevels[z].width + 2) * 32, (self.zLevels[z].height + 2) * 32), "black")
+            nSelAreas = 0
+            for render_pass in xrange(2): 
+                print(' Rendering {0} (pass #{1})...'.format(filename,render_pass+1))
+                for y in xrange(self.zLevels[z].height):
+                    for x in xrange(self.zLevels[z].width):
+                        tile = self.zLevels[z].GetTileAt(x, y)
+                        if tile is not None:
+                            if render_pass==0 and tile.render_deferred: continue
+                            if render_pass==1 and not tile.render_deferred: continue
+                            x_o = 0
+                            y_o = 32 - tile.frame.size[1]  # BYOND uses LOWER left as origin for some fucking reason
+                            new_bb = ((x * 32) + x_o + tile.offset[0], (y * 32) + y_o + tile.offset[1], (x * 32) + tile.frame.size[0] + x_o + tile.offset[0], (y * 32) + tile.frame.size[0] + y_o + tile.offset[1])
+                            frame = tile.frame
+                            if tile.areaSelected:
+                                # Adjust cropping bounds 
+                                if new_bb[0] < bbox[0]:
+                                    bbox[0] = new_bb[0]
+                                if new_bb[1] < bbox[1]:
+                                    bbox[1] = new_bb[1]
+                                if new_bb[2] > bbox[2]:
+                                    bbox[2] = new_bb[2]
+                                if new_bb[3] > bbox[3]:
+                                    bbox[3] = new_bb[3]
+                                nSelAreas += 1
+                            else:
+                                frame = tile.unselected_frame
+                            zpic.paste(frame, new_bb, frame)
             
             if len(self.selectedAreas) == 0:            
                 # Autocrop (only works if NOT rendering stars or areas)
@@ -452,37 +478,28 @@ class Map:
     def consumeTileAtoms(self, line, lineNumber):
         atoms = []
         atom_chunks = self.SplitAtoms(line)
-        # print(line)
-        # print(repr(atom_chunks))
+
         for atom_chunk in atom_chunks:
             atoms += [self.consumeAtom(atom_chunk, lineNumber)]
-        
-        # if '{' in line:
-        #    sys.exit()
+            
         return atoms
     
     def SplitProperties(self, string):
         o = []
         buf = []
         inString = False
-        # print('>>> {0}'.format(string))
         for chunk in string.split(';'):
-            # print(chunk)
             if not inString:
-                # chunk="REMOVE ME"
-                # print('o='+repr(o))
                 if '"' in chunk:
                     inString = False
                     pos = 0
                     while(True):
                         pos = chunk.find('"', pos)
-                        # print('{0}: {1}'.format(pos,chunk[pos:]))
                         if pos == -1:
                             break
                         pc = ''
                         if pos > 0:
                             pc = chunk[pos - 1]
-                        # print(pc)
                         if pc != '\\':
                             inString = not inString
                         pos += 1
@@ -570,8 +587,6 @@ class Map:
                 currentAtom.mapSpecified += [key]
                 
         # Compare to base
-        #currentAtom.SetLayer()
-        # currentAtom.mapSpecified = []
         base_atom = self.GetAtom(currentAtom.path)
         assert base_atom != None
         for key in base_atom.properties.keys():
