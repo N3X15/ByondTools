@@ -6,6 +6,10 @@ from com.byond.basetypes import Atom, BYONDString, BYONDValue, BYONDFileRef
 from PIL import Image, ImageChops
 
 ID_ENCODING_TABLE = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+# Cache
+_icons={}
+_dmis={}
         
 def chunker(iterable, chunksize):
     """
@@ -41,7 +45,7 @@ class Tile:
         self.data = []
         self.frame = None
         self.unselected_frame = None
-        self.render_deferred = False
+        self.selectedArea = True
     
     def ID2String(self, pad=0):
         o = ''
@@ -80,6 +84,111 @@ class Tile:
             return False
         else:
             return all(self.data[i] == other.data[i] for i in range(len(self.data)))
+        
+    def RenderToMapTile(self, passnum, basedir, renderflags):
+        img = Image.new('RGBA', (96, 96))
+        self.offset = (32, 32)
+        foundAPixelOffset=False
+        for atom in sorted(self.data, reverse=True):
+            
+            aid = self.data.index(atom)
+            # Ignore /areas.  They look like ass.
+            if atom.path.startswith('/area'):
+                if not (renderflags & MapRenderFlags.RENDER_AREAS):
+                    continue
+            
+            # We're going to turn space black for smaller images.
+            if atom.path == '/turf/space':
+                if not (renderflags & MapRenderFlags.RENDER_STARS):
+                    continue
+                
+            if 'icon' not in atom.properties:
+                print('CRITICAL: UNKNOWN ICON IN {0} (atom #{1})'.format(self.origID, aid))
+                print(atom.MapSerialize())
+                print(atom.MapSerialize(Atom.FLAG_INHERITED_PROPERTIES))
+                continue
+            
+            dmi_file = atom.properties['icon'].value
+            
+            if 'icon_state' not in atom.properties:
+                # Grab default icon_state ('') if we can't find the one defined.
+                atom.properties['icon_state'] = BYONDString("")
+            
+            state = atom.properties['icon_state'].value
+            
+            direction = SOUTH
+            if 'dir' in atom.properties:
+                try:
+                    direction = int(atom.properties['dir'].value)
+                except ValueError:
+                    print('FAILED TO READ dir = ' + repr(atom.properties['dir'].value))
+                    continue
+            
+            icon_key = '{0}:{1}[{2}]'.format(dmi_file, state, direction)
+            frame = None
+            pixel_x = 0
+            pixel_y = 0
+            if icon_key in _icons:
+                frame, pixel_x, pixel_y = _icons[icon_key]
+            else:
+                dmi_path = os.path.join(basedir, dmi_file)
+                dmi = None
+                if dmi_path in _dmis:
+                    dmi = _dmis[dmi_path]
+                else:
+                    try:
+                        dmi = DMI(dmi_path)
+                        dmi.loadAll()
+                        _dmis[dmi_path] = dmi
+                    except Exception as e:
+                        print(str(e))
+                        for prop in ['icon', 'icon_state', 'dir']:
+                            print('\t{0}'.format(atom.dumpPropInfo(prop)))
+                        pass
+                
+                if dmi.img.mode not in ('RGBA', 'P'):
+                    print('WARNING: {} is mode {}!'.format(dmi_file, dmi.img.mode))
+                    
+                if direction not in IMAGE_INDICES:
+                    print('WARNING: Unrecognized direction {} on atom {} in tile {}!'.format(direction, atom.MapSerialize(), self.origID))
+                    direction = SOUTH  # DreamMaker property editor shows dir = 2.  WTF?
+                    
+                frame = dmi.getFrame(state, direction, 0)
+                if frame == None:
+                    # Get the error/default state.
+                    frame = dmi.getFrame("", direction, 0)
+                
+                if frame == None:
+                    continue
+                
+                if frame.mode != 'RGBA':
+                    frame = frame.convert("RGBA")
+                    
+                pixel_x = 0
+                if 'pixel_x' in atom.properties:
+                    pixel_x = int(atom.properties['pixel_x'].value)
+                    
+                pixel_y = 0
+                if 'pixel_y' in atom.properties:
+                    pixel_y = int(atom.properties['pixel_y'].value)
+                    
+                _icons[icon_key] = (frame, pixel_x, pixel_y)
+            img.paste(frame, (32 + pixel_x, 32 - pixel_y), frame)  # Add to the top of the stack.
+            if pixel_x!=0 or pixel_y!=0:
+                if passnum == 0: return # Wait for next pass
+                foundAPixelOffset=True
+        
+        if passnum == 1 and not foundAPixelOffset:
+            return None
+        if self.areaSelected:
+            # Fade out unselected tiles.
+            bands = list(img.split())
+            # Excluding alpha band
+            for i in range(3):
+                bands[i] = bands[i].point(lambda x: x * 0.4)
+            img = Image.merge(img.mode, bands)
+        
+        return img
     
 class MapLayer:
     def __init__(self, _map, height=255, width=255):
@@ -337,7 +446,7 @@ class Map:
             self.selectedAreas = kwargs['area']
             print('area = ' + repr(self.selectedAreas))
         
-        self.generateTexAtlas(basedir, renderflags)
+        #self.generateTexAtlas(basedir, renderflags)
         
         for tid in xrange(len(self.tileTypes)):
             tile = self.tileTypes[tid]
@@ -351,17 +460,18 @@ class Map:
             
         print('--- Creating maps...')
         for z in self.zLevels.keys():
-            print('Checking z-level {0}...'.format(z))
-            thingsToDo=0
-            for y in xrange(self.zLevels[z].height):
-                for x in xrange(self.zLevels[z].width):
-                    tile = self.zLevels[z].GetTileAt(x, y)
-                    if tile is not None:
-                        if tile.areaSelected:
-                            thingsToDo += 1
-            if thingsToDo==0:
-                print(' Nothing to do, skipping.') 
-                continue
+            if len(self.selectedAreas)>0:
+                print('Checking z-level {0}...'.format(z))
+                thingsToDo=0
+                for y in xrange(self.zLevels[z].height):
+                    for x in xrange(self.zLevels[z].width):
+                        tile = self.zLevels[z].GetTileAt(x, y)
+                        if tile is not None:
+                            if tile.areaSelected:
+                                thingsToDo += 1
+                if thingsToDo==0:
+                    print(' Nothing to do, skipping.') 
+                    continue
             
             #Bounding box, used for cropping.
             bbox = [99999, 99999, 0, 0]
@@ -379,13 +489,14 @@ class Map:
                     for x in xrange(self.zLevels[z].width):
                         tile = self.zLevels[z].GetTileAt(x, y)
                         if tile is not None:
-                            if render_pass==0 and tile.render_deferred: continue
-                            if render_pass==1 and not tile.render_deferred: continue
+                            #if render_pass==0 and tile.render_deferred: continue
+                            #if render_pass==1 and not tile.render_deferred: continue
+                            frame = tile.RenderToMapTile(render_pass,basedir,renderflags)
+                            if frame is None: continue
                             x_o = 0
-                            y_o = 32 - tile.frame.size[1]  # BYOND uses LOWER left as origin for some fucking reason
-                            new_bb = ((x * 32) + x_o + tile.offset[0], (y * 32) + y_o + tile.offset[1], (x * 32) + tile.frame.size[0] + x_o + tile.offset[0], (y * 32) + tile.frame.size[0] + y_o + tile.offset[1])
-                            frame = tile.frame
-                            if tile.areaSelected:
+                            y_o = 32 - frame.size[1]  # BYOND uses LOWER left as origin for some fucking reason
+                            new_bb = ((x * 32) + x_o + tile.offset[0], (y * 32) + y_o + tile.offset[1], (x * 32) + frame.size[0] + x_o + tile.offset[0], (y * 32) + frame.size[0] + y_o + tile.offset[1])
+                            if tile.areaSelected or len(self.selectedAreas)==0:
                                 # Adjust cropping bounds 
                                 if new_bb[0] < bbox[0]:
                                     bbox[0] = new_bb[0]
@@ -396,8 +507,6 @@ class Map:
                                 if new_bb[3] > bbox[3]:
                                     bbox[3] = new_bb[3]
                                 nSelAreas += 1
-                            else:
-                                frame = tile.unselected_frame
                             zpic.paste(frame, new_bb, frame)
             
             if len(self.selectedAreas) == 0:            
@@ -415,12 +524,6 @@ class Map:
                     os.makedirs(filedir)
                 print(' -> {} ({}x{})'.format(filename, zpic.size[0], zpic.size[1]))
                 zpic.save(filename, 'PNG')
-            
-    def loadDMI(self, filename):
-        if filename not in self.DMIs:
-            self.DMIs[filename] = DMI(filename)
-            self.DMIs[filename].loadAll()
-        return self.DMIs[filename]
     
     def cleanTile(self, t):
         for i in xrange(len(t.data)):
