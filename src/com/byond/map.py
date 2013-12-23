@@ -8,8 +8,8 @@ from PIL import Image, ImageChops
 ID_ENCODING_TABLE = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
 # Cache
-_icons={}
-_dmis={}
+_icons = {}
+_dmis = {}
         
 def chunker(iterable, chunksize):
     """
@@ -88,7 +88,7 @@ class Tile:
     def RenderToMapTile(self, passnum, basedir, renderflags):
         img = Image.new('RGBA', (96, 96))
         self.offset = (32, 32)
-        foundAPixelOffset=False
+        foundAPixelOffset = False
         for atom in sorted(self.data, reverse=True):
             
             aid = self.data.index(atom)
@@ -174,13 +174,13 @@ class Tile:
                     
                 _icons[icon_key] = (frame, pixel_x, pixel_y)
             img.paste(frame, (32 + pixel_x, 32 - pixel_y), frame)  # Add to the top of the stack.
-            if pixel_x!=0 or pixel_y!=0:
-                if passnum == 0: return # Wait for next pass
-                foundAPixelOffset=True
+            if pixel_x != 0 or pixel_y != 0:
+                if passnum == 0: return  # Wait for next pass
+                foundAPixelOffset = True
         
         if passnum == 1 and not foundAPixelOffset:
             return None
-        if self.areaSelected:
+        if not self.areaSelected:
             # Fade out unselected tiles.
             bands = list(img.split())
             # Excluding alpha band
@@ -248,6 +248,7 @@ class Map:
             '"':'"',
             '(':')'
         }
+        self.atomCache={}
         nit = self.atomBorders.copy()
         for start, stop in self.atomBorders.items():
             if start != stop:
@@ -342,7 +343,7 @@ class Map:
             img = Image.new('RGBA', (96, 96))
             tile.offset = (32, 32)
             tile.areaSelected = True
-            tile.render_deferred=False
+            tile.render_deferred = False
             for atom in sorted(tile.data, reverse=True):
                 
                 aid = tile.data.index(atom)
@@ -427,8 +428,8 @@ class Map:
                         
                     self._icons[icon_key] = (frame, pixel_x, pixel_y)
                 img.paste(frame, (32 + pixel_x, 32 - pixel_y), frame)  # Add to the top of the stack.
-                if pixel_x!=0 or pixel_y!=0:
-                    tile.render_deferred=True
+                if pixel_x != 0 or pixel_y != 0:
+                    tile.render_deferred = True
             tile.frame = img
             
             # Fade out unselected tiles.
@@ -446,34 +447,35 @@ class Map:
             self.selectedAreas = kwargs['area']
             print('area = ' + repr(self.selectedAreas))
         
-        #self.generateTexAtlas(basedir, renderflags)
+        # self.generateTexAtlas(basedir, renderflags)
         
         for tid in xrange(len(self.tileTypes)):
             tile = self.tileTypes[tid]
             tile.areaSelected = True
-            for atom in tile.data:
-                if atom.path.startswith('/area'):
-                    if atom.path not in self.selectedAreas:
-                        tile.areaSelected = False
-                        break
+            if len(self.selectedAreas) > 0:
+                for atom in tile.data:
+                    if atom.path.startswith('/area'):
+                        if  atom.path not in self.selectedAreas:
+                            tile.areaSelected = False
+                            break
             self.tileTypes[tid] = tile
             
         print('--- Creating maps...')
         for z in self.zLevels.keys():
-            if len(self.selectedAreas)>0:
+            if len(self.selectedAreas) > 0:
                 print('Checking z-level {0}...'.format(z))
-                thingsToDo=0
+                thingsToDo = 0
                 for y in xrange(self.zLevels[z].height):
                     for x in xrange(self.zLevels[z].width):
                         tile = self.zLevels[z].GetTileAt(x, y)
                         if tile is not None:
                             if tile.areaSelected:
                                 thingsToDo += 1
-                if thingsToDo==0:
+                if thingsToDo == 0:
                     print(' Nothing to do, skipping.') 
                     continue
             
-            #Bounding box, used for cropping.
+            # Bounding box, used for cropping.
             bbox = [99999, 99999, 0, 0]
             
             # Replace {z} with current z-level.
@@ -484,19 +486,18 @@ class Map:
             zpic = Image.new('RGBA', ((self.zLevels[z].width + 2) * 32, (self.zLevels[z].height + 2) * 32), "black")
             nSelAreas = 0
             for render_pass in xrange(2): 
-                print(' Rendering {0} (pass #{1})...'.format(filename,render_pass+1))
+                print(' Rendering {0} (pass #{1})...'.format(filename, render_pass + 1))
                 for y in xrange(self.zLevels[z].height):
                     for x in xrange(self.zLevels[z].width):
                         tile = self.zLevels[z].GetTileAt(x, y)
                         if tile is not None:
-                            #if render_pass==0 and tile.render_deferred: continue
-                            #if render_pass==1 and not tile.render_deferred: continue
-                            frame = tile.RenderToMapTile(render_pass,basedir,renderflags)
+                            frame = tile.RenderToMapTile(render_pass, basedir, renderflags)
+                            # Wait for next pass, or failed to get an image.
                             if frame is None: continue
                             x_o = 0
                             y_o = 32 - frame.size[1]  # BYOND uses LOWER left as origin for some fucking reason
                             new_bb = ((x * 32) + x_o + tile.offset[0], (y * 32) + y_o + tile.offset[1], (x * 32) + frame.size[0] + x_o + tile.offset[0], (y * 32) + frame.size[0] + y_o + tile.offset[1])
-                            if tile.areaSelected or len(self.selectedAreas)==0:
+                            if tile.areaSelected or len(self.selectedAreas) == 0:
                                 # Adjust cropping bounds 
                                 if new_bb[0] < bbox[0]:
                                     bbox[0] = new_bb[0]
@@ -583,7 +584,12 @@ class Map:
         atom_chunks = self.SplitAtoms(line)
 
         for atom_chunk in atom_chunks:
-            atoms += [self.consumeAtom(atom_chunk, lineNumber)]
+            if atom_chunk in self.atomCache:
+                atoms += [self.atomCache[atom_chunk].copy()]
+            else:
+                atom = self.consumeAtom(atom_chunk, lineNumber)
+                self.atomCache[atom_chunk]=atom.copy()
+                atoms += [atom]
             
         return atoms
     
