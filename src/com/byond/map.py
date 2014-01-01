@@ -4,6 +4,7 @@ from com.byond.directions import SOUTH, IMAGE_INDICES
 from com.byond.basetypes import Atom, BYONDString, BYONDValue, BYONDFileRef
 # from com.byond.objtree import ObjectTree
 from PIL import Image, ImageChops
+import logging
 
 ID_ENCODING_TABLE = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
@@ -103,9 +104,9 @@ class Tile:
                     continue
                 
             if 'icon' not in atom.properties:
-                print('CRITICAL: UNKNOWN ICON IN {0} (atom #{1})'.format(self.origID, aid))
-                print(atom.MapSerialize())
-                print(atom.MapSerialize(Atom.FLAG_INHERITED_PROPERTIES))
+                logging.critical('UNKNOWN ICON IN {0} (atom #{1})'.format(self.origID, aid))
+                logging.info(atom.MapSerialize())
+                logging.info(atom.MapSerialize(Atom.FLAG_INHERITED_PROPERTIES))
                 continue
             
             dmi_file = atom.properties['icon'].value
@@ -121,7 +122,7 @@ class Tile:
                 try:
                     direction = int(atom.properties['dir'].value)
                 except ValueError:
-                    print('FAILED TO READ dir = ' + repr(atom.properties['dir'].value))
+                    logging.critical('FAILED TO READ dir = ' + repr(atom.properties['dir'].value))
                     continue
             
             icon_key = '{0}:{1}[{2}]'.format(dmi_file, state, direction)
@@ -147,10 +148,10 @@ class Tile:
                         pass
                 
                 if dmi.img.mode not in ('RGBA', 'P'):
-                    print('WARNING: {} is mode {}!'.format(dmi_file, dmi.img.mode))
+                    logging.warn('{} is mode {}!'.format(dmi_file, dmi.img.mode))
                     
                 if direction not in IMAGE_INDICES:
-                    print('WARNING: Unrecognized direction {} on atom {} in tile {}!'.format(direction, atom.MapSerialize(), self.origID))
+                    logging.warn('Unrecognized direction {} on atom {} in tile {}!'.format(direction, atom.MapSerialize(), self.origID))
                     direction = SOUTH  # DreamMaker property editor shows dir = 2.  WTF?
                     
                 frame = dmi.getFrame(state, direction, 0)
@@ -257,7 +258,7 @@ class Map:
         
     def readMap(self, filename):
         if not os.path.isfile(filename):
-            print('File ' + filename + " does not exist.")
+            logging.warn('File ' + filename + " does not exist.")
         self.filename = filename
         with open(filename, 'r') as f:
             print('--- Reading tile types from {0}...'.format(self.filename))
@@ -647,19 +648,15 @@ class Map:
                     if len(ignoreLevel) > 0:
                         if ignoreLevel[-1] == c:
                             ignoreLevel.pop()
-                            # print('POP '+c)
                         else:
                             ignoreLevel.append(c)
-                            # print('PUSH '+c)
                 else:
                     if end == None:
                         if len(ignoreLevel) > 0:
                             if ignoreLevel[-1] == c:
                                 ignoreLevel.pop()
-                                # print('POP '+c)
                     else:
                         ignoreLevel.append(end)
-                        # print('PUSH '+end)
             if c == ',' and len(ignoreLevel) == 0:
                 o += [buf]
                 buf = ''

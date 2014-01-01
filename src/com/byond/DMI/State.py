@@ -1,16 +1,8 @@
 from com.byond import directions
+from PIL import Image
+import logging
 
-class State:
-    name = ''
-    hotspot = ''
-    frames = 0
-    dirs = 1
-    movement = 0
-    loop = 0
-    rewind = 0
-    delay = []
-    icons = []
-    
+class State:    
     def __init__(self, nm):
         self.name = nm
         self.hotspot = ''
@@ -90,17 +82,36 @@ state = "void"
     def numIcons(self):
         return self.frames * self.dirs
     
-    def getFrame(self, direction, frame):
+    def getFrameIndex(self,direction,frame):
         _dir = 0
         if self.dirs == 4 or self.dirs == 8:
             _dir = directions.IMAGE_INDICES.index(direction)
             if self.dirs == 4 and _dir > 3:
                 _dir = 0
-            
+        
         frame = _dir + (frame * self.dirs)
         if frame > len(self.icons):
-            print('Only {} icons in state, args {{dir:{}, frame:{}}}: {}'.format(len(self.icons), direction, frame, self.ToString()))
-        return self.icons[frame]
+            logging.warn('Only {} icons in state, args {{dir:{}, frame:{}}}: {}'.format(len(self.icons), direction, frame, self.ToString()))
+        return frame
+    
+    def getFrame(self, direction, frame):
+        return self.icons[self.getFrameIndex(direction, frame)]
+    
+    def setFrame(self, direction, frame,img):
+        fi = self.getFrameIndex(direction, frame)
+        if len(self.icons) < fi:
+            shouldBeSize=1
+            if fi > 7:
+                logging.error('Unable to set frame: State uninitialized with that many frames.')
+                return
+            elif fi > 3:
+                shouldBeSize=8
+            elif fi > 0:
+                shouldBeSize=4
+            while len(self.icons) < shouldBeSize:
+                self.icons.append(Image.new('RGBA',(32,32)))
+            logging.warn('{0} now has {1} frames.'.format(self.name,len(self.icons)))
+        self.icons[fi]=img
     
     def postProcess(self):
         # So old I forgot what everything did.
