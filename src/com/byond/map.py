@@ -232,7 +232,11 @@ class MapRenderFlags:
     
 class Map:
     WRITE_OLD_IDS = 1
+    
+    READ_NO_BASE_COMP = 1
     def __init__(self, tree=None):
+        self.filename = 'Unknown'
+        self.readFlags = 0
         self.tileTypes = []
         self.zLevels = {}
         self.oldID2NewID = {}
@@ -243,20 +247,24 @@ class Map:
         self.tree = tree
         self.generatedTexAtlas = False
         self.selectedAreas = ()
+
+        self.duplicates = 0
+        self.tileChunk2ID = {}
     
         self.atomBorders = {
             '{':'}',
             '"':'"',
             '(':')'
         }
-        self.atomCache={}
+        self.atomCache = {}
         nit = self.atomBorders.copy()
         for start, stop in self.atomBorders.items():
             if start != stop:
                 nit[stop] = None
         self.atomBorders = nit
         
-    def readMap(self, filename):
+    def readMap(self, filename, flags=0):
+        self.readFlags = flags
         if not os.path.isfile(filename):
             logging.warn('File ' + filename + " does not exist.")
         self.filename = filename
@@ -533,37 +541,41 @@ class Map:
                 del t.data[i].properties['tag']
         return t
             
-    # TODO: THIS IS GODAWFULLY SLOW
     def consumeTiles(self, f):
         index = 0
-        duplicates = 0
-        # self.tileTypes = [Tile() for _ in xrange(10000)]
+        self.duplicates = 0
         lineNumber = 0
+        self.tileChunk2ID = {}
         while True:
             line = f.readline()
             lineNumber += 1
             if line.startswith('"'):
-                t = Tile()
-                t.origID = self.consumeTileID(line)
-                t.data = self.consumeTileAtoms(line.strip()[line.index('(') + 1:-1], lineNumber)
+                t = self.consumeTile(line, lineNumber)
                 t.ID = index
-                tid = self.getTileTypeID(t)
-                if tid == None:
-                    self.tileTypes += [t]
-                    self.idlen = max(self.idlen, len(t.ID2String()))
-                    self.oldID2NewID[t.origID] = t.ID
-                    index += 1
-                    if((index % 100) == 0):
-                        print(index)
-                else:
-                    print('{} duplicate of {}! Installing redirect...'.format(t.origID, tid))
-                    self.oldID2NewID[t.origID] = tid
-                    print(t)
-                    print(self.tileTypes[tid])
-                    duplicates += 1
+                self.tileTypes += [t]
+                self.idlen = max(self.idlen, len(t.ID2String()))
+                self.oldID2NewID[t.origID] = t.ID
+                index += 1
+                if((index % 100) == 0):
+                    print(index)
             else:
-                print('-- {} tiles loaded, {} duplicates discarded'.format(index, duplicates))
+                print('-- {} tiles loaded, {} duplicates discarded'.format(index, self.duplicates))
                 return 
+    
+    def consumeTile(self, line, lineNumber):
+        t = Tile()
+        t.origID = self.consumeTileID(line)
+        tileChunk = line.strip()[line.index('(') + 1:-1]
+        
+        if tileChunk in self.tileChunk2ID:
+            tid = self.tileChunk2ID[tileChunk]
+            print('{} duplicate of {}! Installing redirect...'.format(t.origID, tid))
+            self.oldID2NewID[t.origID] = tid
+            self.duplicates += 1
+            return self.tileTypes[tid]
+        
+        t.data = self.consumeTileAtoms(tileChunk, lineNumber)
+        return t
     def getTileTypeID(self, t):
         for tile in self.tileTypes:
             if tile == t:
@@ -589,7 +601,11 @@ class Map:
                 atoms += [self.atomCache[atom_chunk].copy()]
             else:
                 atom = self.consumeAtom(atom_chunk, lineNumber)
-                self.atomCache[atom_chunk]=atom.copy()
+                if '{' in atom_chunk:
+                    if len(atom.properties) == 0:
+                        logging.error('NO PROPERTIES READ FROM ' + atom_chunk + '!')
+                        sys.exit()
+                self.atomCache[atom_chunk] = atom.copy()
                 atoms += [atom]
             
         return atoms
@@ -693,17 +709,19 @@ class Map:
                 currentAtom.mapSpecified += [key]
                 
         # Compare to base
-        base_atom = self.GetAtom(currentAtom.path)
-        assert base_atom != None
-        for key in base_atom.properties.keys():
-            val = base_atom.properties[key]
-            if key not in currentAtom.properties:
-                currentAtom.properties[key] = val
-        for key in currentAtom.properties.iterkeys():
-            val = currentAtom.properties[key].value
-            if key in base_atom.properties and val == base_atom.properties[key].value:
-                if key in currentAtom.mapSpecified:
-                    currentAtom.mapSpecified.remove(key)
+        if not (self.readFlags & Map.READ_NO_BASE_COMP):
+            base_atom = self.GetAtom(currentAtom.path)
+            assert base_atom != None
+            for key in base_atom.properties.keys():
+                val = base_atom.properties[key]
+                if key not in currentAtom.properties:
+                    currentAtom.properties[key] = val
+            for key in currentAtom.properties.iterkeys():
+                val = currentAtom.properties[key].value
+                if key in base_atom.properties and val == base_atom.properties[key].value:
+                    if key in currentAtom.mapSpecified:
+                        currentAtom.mapSpecified.remove(key)
+                        # print('Removed {0} from atom: Equivalent to base atom!')
         return currentAtom
             
     def consumeDataValue(self, value, lineNumber):

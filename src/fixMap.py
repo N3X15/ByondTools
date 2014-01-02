@@ -46,7 +46,7 @@ class RenameProperty(Matcher):
             return 'Renamed {0} to {1}'.format(self.old, self.new)
     
 class StandardizeManifolds(Matcher):
-    STATE_TO_TYPE={
+    STATE_TO_TYPE = {
         'manifold-b-f':'/obj/machinery/atmospherics/pipe/manifold/supply/hidden',
         'manifold-r-f':'/obj/machinery/atmospherics/pipe/manifold/scrubbers/hidden',
         'manifold-f':'/obj/machinery/atmospherics/pipe/manifold/general/hidden',
@@ -63,15 +63,77 @@ class StandardizeManifolds(Matcher):
         return False
     
     def Fix(self, atom):
-        icon_state=atom.properties['icon_state'].value
-        new_atom=Atom(self.STATE_TO_TYPE[icon_state])
+        icon_state = atom.properties['icon_state'].value
+        new_atom = Atom(self.STATE_TO_TYPE[icon_state])
         if 'dir' in atom.mapSpecified:
-            new_atom.properties['dir']=BYONDValue(atom.properties['dir'].value)
+            new_atom.properties['dir'] = BYONDValue(atom.properties['dir'].value)
             new_atom.mapSpecified += ['dir']
         return new_atom
     
     def __str__(self):
         return 'Standardized pipe manifold'
+    
+class FixVaultFloors(Matcher):
+    """
+    Changes flooring icons to use /vg/'s standardized vault icons.
+    """
+    # state:1
+    ICON_STATE_CHANGES = {
+        'vault:1' :{'icon_state':'dark-markings', 'dir':2},
+        'vault:2' :{'icon_state':'dark vault stripe', 'dir':2},
+        'vault:4' :{'icon_state':'dark-markings', 'dir':1},
+        'vault:8' :{'icon_state':'dark-markings', 'dir':8},
+        'vault:6' :{'icon_state':'dark vault corner', 'dir':2},
+        'vault:10':{'icon_state':'dark vault corner', 'dir':8},
+        'vault:5' :{'icon_state':'dark vault full', 'dir':2},
+        'vault:9' :{'icon_state':'dark loading', 'dir':4},
+        
+        'vault-border:1' :{'icon_state':'dark vault stripe', 'dir':2},
+        'vault-border:2' :{'icon_state':'dark vault stripe', 'dir':1},
+        'vault-border:4' :{'icon_state':'dark vault stripe', 'dir':4},
+        'vault-border:8' :{'icon_state':'dark vault stripe', 'dir':8},
+        'vault-border:6' :{'icon_state':'dark vault corner', 'dir':2},
+        'vault-border:10':{'icon_state':'dark vault stripe', 'dir':5},
+        'vault-border:5' :{'icon_state':'dark vault stripe', 'dir':5},
+        'vault-border:9' :{'icon_state':'dark vault stripe', 'dir':6},
+    }
+    def __init__(self):
+        self.stateKey = ''
+        return
+    
+    def GetStateKey(self, atom):
+        icon_state = ''
+        _dir = '2'
+        if 'dir' in atom.properties:
+            _dir = str(atom.properties['dir'].value)
+        if 'icon_state' in atom.properties:
+            icon_state = atom.properties['icon_state'].value
+        return icon_state + ":" + _dir
+        
+    def Matches(self, atom):
+        if atom.path.startswith('/turf/') and 'icon_state' in atom.mapSpecified:
+            sk = self.GetStateKey(atom)
+            if sk in self.ICON_STATE_CHANGES:
+                self.stateKey = sk
+                return True
+        return False
+    
+    def Fix(self, atom):
+        changes = self.ICON_STATE_CHANGES[self.stateKey]
+        if 'tag' in atom.mapSpecified:
+            atom.mapSpecified.remove('tag')
+        for key in changes:
+            if key not in atom.mapSpecified:
+                atom.mapSpecified += [key]
+            newval = changes[key]
+            if isinstance(newval, str):
+                atom.properties[key] = BYONDString(newval)
+            elif isinstance(newval, int):
+                atom.properties[key] = BYONDValue(newval)
+        return atom
+    
+    def __str__(self):
+        return 'Standardized vault flooring'
     
 class ChangeType(Matcher):
     def __init__(self, old, new):
@@ -117,7 +179,10 @@ actions = [
     FixNetwork(),
     
     # Standardize pipes
-    StandardizeManifolds()
+    StandardizeManifolds(),
+    
+    # Standardize vault flooring
+    FixVaultFloors()
 ]
 with open(sys.argv[2], 'r') as repl:
     for line in repl:

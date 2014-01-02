@@ -3,7 +3,7 @@ Created on Nov 6, 2013
 
 @author: Rob
 '''
-#import logging
+# import logging
 AREA_LAYER = 1
 TURF_LAYER = 2
 OBJ_LAYER = 3
@@ -68,6 +68,7 @@ class Atom:
     def copy(self):
         new_node = Atom(self.path)
         new_node.properties = self.properties.copy()
+        new_node.mapSpecified = self.mapSpecified
         # new_node.parent = self.parent
         return new_node
 
