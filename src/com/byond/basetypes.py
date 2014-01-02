@@ -115,8 +115,9 @@ class Atom:
         else:
             for i in range(len(self.mapSpecified)):
                 key = self.mapSpecified[i]
-                val = self.properties[key]
-                atomContents += ['{0} = {1}'.format(key, val)]
+                if key in self.properties:
+                    val = self.properties[key]
+                    atomContents += ['{0} = {1}'.format(key, val)]
         if len(atomContents) > 0:
             return self.path + '{' + '; '.join(atomContents) + '}'
         else:

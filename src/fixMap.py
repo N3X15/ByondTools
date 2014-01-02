@@ -99,6 +99,7 @@ class FixVaultFloors(Matcher):
     }
     def __init__(self):
         self.stateKey = ''
+        self.changesMade=[]
         return
     
     def GetStateKey(self, atom):
@@ -119,21 +120,25 @@ class FixVaultFloors(Matcher):
         return False
     
     def Fix(self, atom):
-        changes = self.ICON_STATE_CHANGES[self.stateKey]
+        self.changesMade=[]
+        propChanges = self.ICON_STATE_CHANGES[self.stateKey]
         if 'tag' in atom.mapSpecified:
             atom.mapSpecified.remove('tag')
-        for key in changes:
+        for key,newval in propChanges.items():
             if key not in atom.mapSpecified:
                 atom.mapSpecified += [key]
-            newval = changes[key]
+            oldval = 'NONE'
+            if key in atom.properties:
+                oldval = str(atom.properties[key])
             if isinstance(newval, str):
                 atom.properties[key] = BYONDString(newval)
             elif isinstance(newval, int):
                 atom.properties[key] = BYONDValue(newval)
+            self.changesMade += ['{0}: {1} -> {2}'.format(key,oldval,atom.properties[key])]
         return atom
     
     def __str__(self):
-        return 'Standardized vault flooring'
+        return 'Standardized vault flooring ('+', '.join(self.changesMade)+')'
     
 class ChangeType(Matcher):
     def __init__(self, old, new):

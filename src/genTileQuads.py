@@ -125,13 +125,6 @@ tileDefs={
             'brown',
             'vault'
         ]
-    },
-    'combo': {
-        'base': 'white',
-        'arrangements':[
-            ['white',    'whitered',
-             'whiteblue','whitered']
-        ]
     }
 }
 knownQuads = [
