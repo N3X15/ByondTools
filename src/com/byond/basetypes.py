@@ -52,6 +52,11 @@ class BYONDString(BYONDValue):
     def __repr__(self):
         return '<BYONDString value="{}" filename="{}" line={}>'.format(self.value, self.filename, self.line)
     
+class PropertyFlags:
+    MAP_SPECIFIED = 1
+    STRING  = 2
+    FILEREF = 4
+    VALUE   = 8
 class Atom:
     FLAG_INHERITED_PROPERTIES = 1
     def __init__(self, path, filename='', line=0):
@@ -71,6 +76,29 @@ class Atom:
         new_node.mapSpecified = self.mapSpecified
         # new_node.parent = self.parent
         return new_node
+    
+    def getProperty(self,index,default=None):
+        prop = self.properties.get(index,None)
+        if prop == None:
+            return default
+        return prop.value
+    
+    def setProperty(self,index,value,flags=0):
+        if flags & PropertyFlags.MAP_SPECIFIED:
+            if index not in self.mapSpecified:
+                self.mapSpecified += [index]
+        if flags & PropertyFlags.VALUE:
+            self.properties[index]=BYONDValue(value)
+        elif isinstance(value,str) or flags & PropertyFlags.STRING:
+            if flags & PropertyFlags.STRING:
+                value=str(value)
+            self.properties[index]=BYONDString(value)
+        elif flags & PropertyFlags.FILEREF:
+            if flags & PropertyFlags.RILEREF:
+                value=str(value)
+            self.properties[index]=BYONDFileRef(value)
+        else:
+            self.properties[index]=BYONDValue(value)
 
     def InheritProperties(self):
         if self.parent:
