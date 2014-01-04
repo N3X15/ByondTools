@@ -146,6 +146,9 @@ class Tile:
                         for prop in ['icon', 'icon_state', 'dir']:
                             print('\t{0}'.format(atom.dumpPropInfo(prop)))
                         pass
+                if dmi.img is None:
+                    logging.warning('Unable to open {0}!'.format(dmi_path))
+                    continue
                 
                 if dmi.img.mode not in ('RGBA', 'P'):
                     logging.warn('{} is mode {}!'.format(dmi_file, dmi.img.mode))
@@ -408,6 +411,10 @@ class Map:
                             for prop in ['icon', 'icon_state', 'dir']:
                                 print('\t{0}'.format(atom.dumpPropInfo(prop)))
                             pass
+                        
+                    if dmi.img is None:
+                        logging.warning('Unable to open {0}!'.format(dmi_path))
+                        continue
                     
                     if dmi.img.mode not in ('RGBA', 'P'):
                         print('WARNING: {} is mode {}!'.format(dmi_file, dmi.img.mode))

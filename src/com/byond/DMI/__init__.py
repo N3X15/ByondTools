@@ -12,17 +12,6 @@ class DMILoadFlags:
     
 
 class DMI:
-    version = ''
-    states = {}
-    iw = 32
-    ih = 32
-    filename = ''
-    pixels = None
-    size = ()
-    statelist = ''
-    max_x = -1
-    max_y = -1
-    
     def __init__(self, filename):
         self.filename = filename
         self.version = ''
@@ -34,6 +23,7 @@ class DMI:
         self.statelist = 'LOLNONE'
         self.max_x = -1
         self.max_y = -1
+        self.img = None
         
     def make(self, makefile):
         print('>>> Compiling %s -> %s' % (makefile, self.filename))
