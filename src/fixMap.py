@@ -7,7 +7,7 @@ fixMap.py map.dmm replacements.txt
 """
 import sys
 from com.byond.map import Map
-from com.byond.basetypes import BYONDString, BYONDValue, Atom
+from com.byond.basetypes import BYONDString, BYONDValue, Atom, PropertyFlags
 
 class Matcher:
     def Matches(self, atom):
@@ -59,19 +59,57 @@ class StandardizeManifolds(Matcher):
         
     def Matches(self, atom):
         if atom.path == '/obj/machinery/atmospherics/pipe/manifold' and 'icon_state' in atom.mapSpecified:
-            return atom.properties['icon_state'].value in self.STATE_TO_TYPE
+            return atom.getProperty('icon_state') in self.STATE_TO_TYPE
         return False
     
     def Fix(self, atom):
         icon_state = atom.properties['icon_state'].value
         new_atom = Atom(self.STATE_TO_TYPE[icon_state])
         if 'dir' in atom.mapSpecified:
-            new_atom.properties['dir'] = BYONDValue(atom.properties['dir'].value)
-            new_atom.mapSpecified += ['dir']
+            new_atom.setProperty('dir', atom.getProperty('dir'), PropertyFlags.MAP_SPECIFIED)
         return new_atom
     
     def __str__(self):
         return 'Standardized pipe manifold'
+    
+class StandardizeInsulatedPipes(Matcher):
+    STATE_TO_TYPE = {
+        'intact'  :'/obj/machinery/atmospherics/pipe/simple/insulated/visible',
+        'intact-f':'/obj/machinery/atmospherics/pipe/simple/insulated/hidden'
+    }
+    def __init__(self):
+        return
+        
+    def Matches(self, atom):
+        if atom.path == '/obj/machinery/atmospherics/pipe/simple/insulated':
+            return True
+        if atom.path.startswith('/obj/machinery/atmospherics/pipe/simple/insulated') and int(atom.getProperty('dir', 0)) in (3, 8, 12):
+            #print(atom.MapSerialize())
+            return True
+        return False
+    
+    def Fix(self, atom):
+        newtype = atom.path
+        if atom.path == '/obj/machinery/atmospherics/pipe/simple/insulated':
+            icon_state = ''
+            if 'icon_state' in atom.properties:
+                icon_state = atom.properties['icon_state'].value
+            newtype = self.STATE_TO_TYPE.get(icon_state, '/obj/machinery/atmospherics/pipe/simple/insulated/visible')
+        new_atom = Atom(newtype)
+        if 'dir' in atom.mapSpecified:
+            # Normalize dir
+            direction = int(atom.getProperty('dir', 2))
+            if direction == 3:
+                direction = 1
+            elif direction == 8:  # Breaks things, for some reason
+                direction = 4
+            elif direction == 12:
+                direction = 4
+            new_atom.setProperty('dir', direction, PropertyFlags.MAP_SPECIFIED)
+        return new_atom
+    
+    def __str__(self):
+        return 'Standardized insulated pipe'
     
 class FixVaultFloors(Matcher):
     """
@@ -99,16 +137,16 @@ class FixVaultFloors(Matcher):
     }
     def __init__(self):
         self.stateKey = ''
-        self.changesMade=[]
+        self.changesMade = []
         return
     
     def GetStateKey(self, atom):
         icon_state = ''
         _dir = '2'
         if 'dir' in atom.properties:
-            _dir = str(atom.properties['dir'].value)
+            _dir = str(atom.getProperty('dir'))
         if 'icon_state' in atom.properties:
-            icon_state = atom.properties['icon_state'].value
+            icon_state = atom.getProperty('icon_state')
         return icon_state + ":" + _dir
         
     def Matches(self, atom):
@@ -120,11 +158,11 @@ class FixVaultFloors(Matcher):
         return False
     
     def Fix(self, atom):
-        self.changesMade=[]
+        self.changesMade = []
         propChanges = self.ICON_STATE_CHANGES[self.stateKey]
         if 'tag' in atom.mapSpecified:
             atom.mapSpecified.remove('tag')
-        for key,newval in propChanges.items():
+        for key, newval in propChanges.items():
             if key not in atom.mapSpecified:
                 atom.mapSpecified += [key]
             oldval = 'NONE'
@@ -134,11 +172,11 @@ class FixVaultFloors(Matcher):
                 atom.properties[key] = BYONDString(newval)
             elif isinstance(newval, int):
                 atom.properties[key] = BYONDValue(newval)
-            self.changesMade += ['{0}: {1} -> {2}'.format(key,oldval,atom.properties[key])]
+            self.changesMade += ['{0}: {1} -> {2}'.format(key, oldval, atom.properties[key])]
         return atom
     
     def __str__(self):
-        return 'Standardized vault flooring ('+', '.join(self.changesMade)+')'
+        return 'Standardized vault flooring (' + ', '.join(self.changesMade) + ')'
     
 class ChangeType(Matcher):
     def __init__(self, old, new):
@@ -185,6 +223,9 @@ actions = [
     
     # Standardize pipes
     StandardizeManifolds(),
+    
+    # Standardize insulated pipes
+    StandardizeInsulatedPipes(),
     
     # Standardize vault flooring
     FixVaultFloors()
