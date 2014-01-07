@@ -4,9 +4,10 @@ Superficially generate an object/property tree.
 import re, logging, os
 from .basetypes import *
 
-REGEX_TABS = re.compile('^(?P<tabs>\t*)')  # \s*$
-REGEX_VARIABLE_STRING = re.compile('^(?P<tabs>\t+)(?:var/)?(?P<type>[a-zA-Z0-9_]*/)?(?P<variable>[a-zA-Z0-9_]+)\s*=\s*(?P<qmark>[\'"])(?P<content>.+)(?P=qmark)\s*$')
-REGEX_VARIABLE_NUMBER = re.compile('^(?P<tabs>\t+)(?:var/)?(?P<type>[a-zA-Z0-9_]*/)?(?P<variable>[a-zA-Z0-9_]+)\s*=\s*(?P<content>[0-9\.\-]+)\s*$')
+REGEX_TABS = re.compile('^(?P<tabs>[\t\s]*)')  # \s*$
+# REGEX_VARIABLE_STRING   = re.compile('^(?P<tabs>\t+)(?:var/)?(?P<type>[a-zA-Z0-9_]*/)?(?P<variable>[a-zA-Z0-9_]+)\s*=\s*(?P<qmark>[\'"])(?P<content>.+)(?P=qmark)\s*$')
+# REGEX_VARIABLE_NUMBER   = re.compile('^(?P<tabs>\t+)(?:var/)?(?P<type>[a-zA-Z0-9_]*/)?(?P<variable>[a-zA-Z0-9_]+)\s*=\s*(?P<content>[0-9\.\-]+)\s*$')
+# REGEX_VARIABLE_DATUM    = re.compile('^(?P<tabs>\t+)(?:var/)?(?P<type>[a-zA-Z0-9_/]*/)?(?P<variable>[a-zA-Z0-9_]+)\s*=\s*(?P<content>[0-9\.\-]+)\s*$')
 REGEX_ATOMDEF = re.compile('^(?P<tabs>\t*)(?P<atom>[a-zA-Z0-9_/]+)\\{?\\s*$')
 REGEX_ABSOLUTE_PROCDEF = re.compile('^(?P<tabs>\t*)(?P<atom>[a-zA-Z0-9_/]+)/(?P<proc>[a-zA-Z0-9_]+)\((?P<args>.*)\)\\{?\s*$')
 REGEX_RELATIVE_PROCDEF = re.compile('^(?P<tabs>\t*)(?P<proc>[a-zA-Z0-9_]+)\((?P<args>.*)\)\\{?\\s*$')
@@ -17,12 +18,12 @@ def debug(filename, line, path, message):
 
 class ObjectTree:
     reserved_words = ('else', 'break', 'return', 'continue', 'spawn', 'proc')
-    stdlib_files=(
+    stdlib_files = (
         'dm_std.dm',
         'atom_defaults.dm'
     )
-    def __init__(self):
-        self.LoadedStdLib=False
+    def __init__(self, **options):
+        self.LoadedStdLib = False
         self.Atoms = {}
         self.Tree = Atom('')
         self.cpath = []
@@ -37,11 +38,14 @@ class ObjectTree:
             '/*':'*/',
             '{"':'"}'
         }
-        self.defines={}
-        self.defineMatchers={}
+        self.defines = {}
+        self.defineMatchers = {}
+        self.comments = []
+        self.fileLayouts = {}
+        self.LeavePreprocessorDirectives = options.get('preprocessor_directives', False)
         
         nit = self.ignoreTokens.copy()
-        for start, stop in self.ignoreTokens.iteritems():
+        for _, stop in self.ignoreTokens.iteritems():
             nit[stop] = None
         self.ignoreTokens = nit
     
@@ -67,12 +71,12 @@ class ObjectTree:
                     buf += [chunk]
         return o
         
-    def ProcessFilesFromDME(self, dmefile='baystation12.dme', ext='.dm'):
-        if not self.LoadedStdLib:
-            stdlib_dir=os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
-            stdlib_dir=os.path.join(stdlib_dir,'stdlib')
+    def ProcessFilesFromDME(self, dmefile='baystation12.dme', ext='.dm', **kwargs):
+        if not self.LoadedStdLib and kwargs.get('load_stdlib', True):
+            stdlib_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+            stdlib_dir = os.path.join(stdlib_dir, 'stdlib')
             for filename in self.stdlib_files:
-                self.ProcessFile(os.path.join(stdlib_dir,filename))
+                self.ProcessFile(os.path.join(stdlib_dir, filename))
                 
         print('--- Parsing DM files...')
         numFilesTotal = 0
@@ -162,14 +166,36 @@ class ObjectTree:
         npath = '/'.join(self.cpath)
         if npath not in self.Atoms:
             if procArgs is not None:
-                #print(npath)
+                # print(npath)
                 assert npath.endswith(')')
                 self.Atoms[npath] = Proc(npath, procArgs, filename, ln)
             else:
                 self.Atoms[npath] = Atom(npath, filename, ln)
-            #if self.debugOn: print('Added ' + npath)
+            # if self.debugOn: print('Added ' + npath)
         self.pindent = numtabs
+        return self.Atoms[npath]
     
+    def AddCodeToProc(self, startIndent, code):
+        if '\n' in code:
+            for line in code.split('\n'):
+                self.AddCodeToProc(startIndent, line)
+        else:
+            m = REGEX_TABS.match(code)
+            if m is not None:
+                numtabs = len(m.group('tabs'))
+            i = max(1, numtabs - startIndent)
+            # self.loadingProc.AddCode(i, '/* {0} */ {1}'.format(i,code.strip()))
+            self.loadingProc.AddCode(i, code.rstrip())
+            
+        
+    def finishComment(self, line, **args):
+        self.comments += [self.comment]
+        self.fileLayout += [('COMMENT', len(self.comments) - 1)]
+        if self.ignoreDebugOn: print('finishComment({}): {}'.format(line, self.comment))
+        if self.loadingProc is not None and (args.get('cleansed_line', '') == '' and not self.comment.strip().startswith('//')):
+            self.AddCodeToProc(self.ignoreStartIndent, self.comment)
+        self.comment = ''
+        
     def ProcessFile(self, filename):
         self.cpath = []
         self.popLevels = []
@@ -178,7 +204,11 @@ class ObjectTree:
         self.debugOn = False
         self.ignoreDebugOn = False
         self.ignoreStartIndent = -1
-        self.ignoringProc = ''
+        self.loadingProc = None
+        self.comment = ''
+        self.fileLayout = []
+        self.lineBeforePreprocessing = ''
+        self.current_filename = filename
         with open(filename, 'r') as f:
             ln = 0
             ignoreLevel = []
@@ -190,6 +220,7 @@ class ObjectTree:
                 nl = ''
                     
                 line = line.rstrip()
+                self.lineBeforePreprocessing = line
                 line_len = len(line)
                 for i in xrange(line_len):
                     c = line[i]
@@ -201,16 +232,23 @@ class ObjectTree:
                     if skipNextChar:
                         if self.ignoreDebugOn: print('Skipping {}.'.format(repr(tok)))
                         skipNextChar = False
+                        # self.comment += c
+                        if self.ignoreDebugOn: print('self.comment = {}.'.format(repr(self.comment)))
                         continue
                     if tok == '//':
                         # if self.ignoreDebugOn: debug(filename,ln,self.cpath,'{} ({})'.format(tok,len(ignoreLevel)))
                         if len(ignoreLevel) == 0:
+                            self.comment = line[i:]
+                            # if self.ignoreDebugOn: print('self.comment = {}.'.format(repr(self.comment)))
+                            # print('Found '+self.comment)
+                            self.finishComment('243', cleaned_line=nl)
                             break
                     if tok in self.ignoreTokens:
                         pc = ''
                         if i > 0:
-                            pc = line[i-1]
-                        if tok=='{"' and pc=='"':
+                            pc = line[i - 1]
+                        if tok == '{"' and pc == '"':
+                            self.comment += c
                             continue
                         # if self.ignoreDebugOn: print(repr(self.ignoreTokens[tok]))
                         stop = self.ignoreTokens[tok]
@@ -218,134 +256,210 @@ class ObjectTree:
                             if len(ignoreLevel) > 0:
                                 if ignoreLevel[-1] == tok:
                                     skipNextChar = True
+                                    self.comment += tok
                                     ignoreLevel.pop()
+                                    if len(ignoreLevel) == 0:
+                                        self.finishComment('261')
                                     continue
                                 else:
+                                    self.comment += c
                                     continue
                         else:  # Start comment
                             skipNextChar = True
                             ignoreLevel += [stop]
+                            self.comment = tok
                             continue
                         if self.ignoreDebugOn: debug(filename, ln, self.cpath, '{} ({})'.format(tok, len(ignoreLevel)))
                     if len(ignoreLevel) == 0:
                         nl += c
+                    else:
+                        self.comment += c
                 if line != nl:
                     if self.ignoreDebugOn: print('IN : ' + line)
                     line = nl
                     if self.ignoreDebugOn: print('OUT: ' + line)
+                    if self.ignoreDebugOn: print('self.comment = {}.'.format(repr(self.comment)))
                     
                 if len(ignoreLevel) > 0:
+                    self.comment += "\n"
                     continue
                 
                 line = REGEX_LINE_COMMENT.sub('', line)
                 
                 if line.strip() == '':
+                    if self.loadingProc is not None:
+                        self.loadingProc.AddBlankLine()
                     continue
                 
                 if line.startswith("#"):
                     if line.endswith('\\'): continue
                     if line.startswith('#define'):
                         # #define SOMETHING Value
-                        defineChunks = line.split(None,3)
-                        if len(defineChunks)==2:
-                            defineChunks+=[1]
-                        #print(repr(defineChunks))
+                        defineChunks = line.split(None, 3)
+                        if len(defineChunks) == 2:
+                            defineChunks += [1]
+                        # print(repr(defineChunks))
                         try:
                             if '.' in defineChunks[2]:
-                                self.defines[defineChunks[1]]=BYONDValue(float(defineChunks[2]),filename,ln)
+                                self.defines[defineChunks[1]] = BYONDValue(float(defineChunks[2]), filename, ln)
                             else:
-                                self.defines[defineChunks[1]]=BYONDValue(int(defineChunks[2]),filename,ln)
+                                self.defines[defineChunks[1]] = BYONDValue(int(defineChunks[2]), filename, ln)
                         except:
-                            self.defines[defineChunks[1]]=BYONDString(defineChunks[2],filename,ln)
+                            self.defines[defineChunks[1]] = BYONDString(defineChunks[2], filename, ln)
+                        self.fileLayout += [('DEFINE', defineChunks[1], defineChunks[2])]
                     elif line.startswith('#undef'):
-                        undefChunks = line.split(' ',2)
+                        undefChunks = line.split(' ', 2)
                         if undefChunks[1] in self.defines:
                             del self.defines[undefChunks[1]]
+                        self.fileLayout += [('UNDEF', undefChunks[1])]
                     else:
-                        chunks=line.split(' ')
-                        print('BUG: Unhandled preprocessor directive {} in {}:{}'.format(chunks[0],filename,ln))
+                        chunks = line.split(' ')
+                        self.fileLayout += [('PP_TOKEN', line)]
+                        print('BUG: Unhandled preprocessor directive {} in {}:{}'.format(chunks[0], filename, ln))
                     continue
                 else:
-                    for key,define in self.defines.items():
+                    for key, define in self.defines.items():
                         if key in line:
                             if key not in self.defineMatchers:
-                                self.defineMatchers[key]=re.compile(r'\b'+key+r'\b')
-                            newline=self.defineMatchers[key].sub(str(define.value),line)
-                            #print('OLD: {}'.format(line))
-                            #print('PPD: {}'.format(newline))
-                            line=newline
+                                self.defineMatchers[key] = re.compile(r'\b' + key + r'\b')
+                            newline = self.defineMatchers[key].sub(str(define.value), line)
+                            # print('OLD: {}'.format(line))
+                            # print('PPD: {}'.format(newline))
+                            line = newline
                 
-                m = REGEX_TABS.match(line)
+                m = REGEX_TABS.match(self.lineBeforePreprocessing)
                 if m is not None:
                     numtabs = len(m.group('tabs'))
                     if self.ignoreStartIndent > -1 and self.ignoreStartIndent < numtabs:
-                        if self.debugOn: print('TABS: {} ? {} - {}: {}'.format(numtabs, self.ignoreStartIndent, self.ignoringProc, line))
+                        if self.loadingProc is not None:
+                            # self.loadingProc.AddCode(numtabs - self.ignoreStartIndent, self.lineBeforePreprocessing.strip())
+                            self.AddCodeToProc(self.ignoreStartIndent, self.lineBeforePreprocessing)
+                        if self.debugOn: print('TABS: {} ? {} - {}: {}'.format(numtabs, self.ignoreStartIndent, self.loadingProc, line))
                         continue
                     else:
                         if self.debugOn and self.ignoreStartIndent > -1: print('BREAK ({} -> {}): {}'.format(self.ignoreStartIndent, numtabs, line))
                         self.ignoreStartIndent = -1
-                        self.ignoringProc = ''
+                        self.loadingProc = None
                 else:
                     if self.debugOn and self.ignoreStartIndent > -1: print('BREAK ' + line)
                     self.ignoreStartIndent = -1
-                    self.ignoringProc = ''
+                    self.loadingProc = None
                 
-                m = REGEX_ATOMDEF.match(line)
-                if m is not None:
-                    numtabs = len(m.group('tabs'))
-                    atom = m.group('atom')
-                    atom_path = self.SplitPath(atom)
-                    self.ProcessAtom(filename, ln, line, atom, atom_path, numtabs)
-                    continue
-                
-                m = REGEX_ABSOLUTE_PROCDEF.match(line)
-                if m is not None:
-                    numtabs = len(m.group('tabs'))
-                    atom = '{0}/{1}({2})'.format(m.group('atom'), m.group("proc"), m.group('args')) 
-                    atom_path = self.SplitPath(atom)
-                    #print('PROCESSING ABS PROC AT INDENT > ' + str(numtabs) + " " + atom+" -> "+repr(atom_path))
-                    self.ProcessAtom(filename, ln, line, atom, atom_path, numtabs, m.group('args').split(','))
-                    self.ignoreStartIndent = numtabs
-                    self.ignoringProc = atom
-                    continue
-                
-                m = REGEX_RELATIVE_PROCDEF.match(line)
-                if m is not None:
-                    numtabs = len(m.group('tabs'))
-                    atom = '{}({})'.format(m.group("proc"), m.group('args')) 
-                    atom_path = self.SplitPath(atom)
-                    #print('IGNORING RELATIVE PROC AT INDENT > ' + str(numtabs) + " " + line)
-                    self.ProcessAtom(filename, ln, line, atom, atom_path, numtabs, m.group('args').split(','))
-                    self.ignoreStartIndent = numtabs
-                    self.ignoringProc = atom
-                    continue
+                if not line.strip().startswith('var/'):
+                    m = REGEX_ATOMDEF.match(line)
+                    if m is not None:
+                        numtabs = len(m.group('tabs'))
+                        atom = m.group('atom')
+                        atom_path = self.SplitPath(atom)
+                        atom = self.ProcessAtom(filename, ln, line, atom, atom_path, numtabs)
+                        if atom is None: continue
+                        self.fileLayout += [('ATOMDEF', atom.path)]
+                        continue
+                    
+                    m = REGEX_ABSOLUTE_PROCDEF.match(line)
+                    if m is not None:
+                        numtabs = len(m.group('tabs'))
+                        atom = '{0}/{1}({2})'.format(m.group('atom'), m.group("proc"), m.group('args')) 
+                        atom_path = self.SplitPath(atom)
+                        # print('PROCESSING ABS PROC AT INDENT > ' + str(numtabs) + " " + atom+" -> "+repr(atom_path))
+                        proc = self.ProcessAtom(filename, ln, line, atom, atom_path, numtabs, m.group('args').split(','))
+                        if proc is None: continue
+                        self.ignoreStartIndent = numtabs
+                        self.loadingProc = proc
+                        self.fileLayout += [('PROCDEF', proc.path)]
+                        continue
+                    
+                    m = REGEX_RELATIVE_PROCDEF.match(line)
+                    if m is not None:
+                        numtabs = len(m.group('tabs'))
+                        atom = '{}({})'.format(m.group("proc"), m.group('args')) 
+                        atom_path = self.SplitPath(atom)
+                        # print('IGNORING RELATIVE PROC AT INDENT > ' + str(numtabs) + " " + line)
+                        proc = self.ProcessAtom(filename, ln, line, atom, atom_path, numtabs, m.group('args').split(','))
+                        if proc is None: continue
+                        self.ignoreStartIndent = numtabs
+                        self.loadingProc = proc
+                        self.fileLayout += [('PROCDEF', proc.path)]
+                        continue
                 
                 path = '/'.join(self.cpath)
-                if len(self.cpath) > 0 and 'proc' in self.cpath:
+                # if len(self.cpath) > 0 and 'proc' in self.cpath:
+                #    continue
+                if 'proc' in self.cpath:
                     continue
-                m = REGEX_VARIABLE_STRING.match(line)
-                if m is not None:
+                if '=' in line or line.strip().startswith('var/'):
                     if path not in self.Atoms:
                         self.Atoms[path] = Atom(path)
-                    name = m.group('variable')
-                    content = m.group('content')
-                    qmark = m.group('qmark')
-                    if self.debugOn: print('{3}: var/{0} = {1}{2}{1}'.format(name, qmark, content,path))
-                    if qmark == '"':
-                        self.Atoms[path].properties[name] = BYONDString(content, filename, ln)
-                    else:
-                        self.Atoms[path].properties[name] = BYONDFileRef(content, filename, ln)
-                m = REGEX_VARIABLE_NUMBER.match(line)
-                if m is not None:
-                    if path not in self.Atoms:
-                        self.Atoms[path] = Atom(path)
-                    name = m.group('variable')
-                    content = m.group('content')
-                    if self.debugOn: print('var/{0} = {1}'.format(name, content))
-                    if '.' in content:
-                        self.Atoms[path].properties[name] = BYONDValue(float(content), filename, ln)
-                    else:
-                        self.Atoms[path].properties[name] = BYONDValue(int(content), filename, ln)
+                    name, prop = self.consumeVariable(line, filename, ln)
+                    self.Atoms[path].properties[name] = prop
+                    self.fileLayout += [('VAR', path, name)]
+        self.fileLayouts[filename] = self.fileLayout
+        
+    def consumeVariable(self, line, filename, ln):
+        declaration = False
+        value = None
+        size = None
+        
+        decl = ''
+        if self.LeavePreprocessorDirectives:
+            line = decl = self.lineBeforePreprocessing.strip()
+        else:
+            decl = line.strip()
+        if '[' in line:
+            line_split, arr_decl = line.split('[', 1)
+            str_size = arr_decl[:arr_decl.index(']')]
+            size = -1
+            if str_size != '':
+                try:
+                    size = int(str_size)
+                except ValueError:
+                    pass
+            # print(repr({'size':size,'line':line_split}))
+            line = line_split
+            
+        if '=' in line:
+            decl, value = line.split('=', 1)
+            decl = decl.strip()
+            value = value.strip()
+        else:
+            decl = line.strip()
+            value = None
+        # print(repr({'decl':decl,'value':value}))
+            
+        # (var)(/global|const|tmp)(/type/fragment)name
+        if decl.startswith('var/'):
+            declaration = True
+            decl = decl[4:]
+        pathchunks = decl.split('/')
+        name = pathchunks[-1]
+        special = None
+        typepath = '/'
+        if declaration:
+            if pathchunks[0] in ('tmp', 'global', 'const'):
+                special = pathchunks[0]
+                pathchunks = pathchunks[1:]
+            if 'list' not in pathchunks and size is not None:
+                pathchunks = ['list'] + pathchunks
+            typepath = '/' + '/'.join(pathchunks[:-1])
+            
+        kwargs = {
+            'declaration':declaration,
+            'special':special,
+            'size':size
+        }
+        if typepath != '/':
+            return (name, BYONDValue(value, filename, ln, typepath, **kwargs))
+        elif value and value[0] == '"':
+            return (name, BYONDString(value[1:-1], filename, ln, **kwargs))
+        elif value and value[0] == "'":
+            return (name, BYONDFileRef(value[1:-1], filename, ln, **kwargs))
+        elif value and '.' in value:
+            try:
+                return (name, BYONDValue(float(value), filename, ln, typepath, **kwargs))
+            except ValueError:
+                pass
+        return (name, BYONDValue(value, filename, ln, typepath, **kwargs))
+        
     def MakeTree(self):
         print('Generating Tree...')
         self.Tree = Atom('/')
@@ -368,14 +482,14 @@ class ObjectTree:
                             cNode.children[path_item] = self.Atoms[cpath_str]
                         else:
                             if '(' in path_item:
-                                cNode.children[path_item] = Proc('/'.join([''] + cpath),[])
+                                cNode.children[path_item] = Proc('/'.join([''] + cpath), [])
                             else:
                                 cNode.children[path_item] = Atom('/'.join([''] + cpath))
                         cNode.children[path_item].parent = cNode
                     cNode = cNode.children[path_item]
         self.Tree.InheritProperties()
         print('Processed {0} atoms.'.format(len(self.Atoms)))
-        self.Atoms = {}
+        # self.Atoms = {}
         
     def GetAtom(self, path):
         if path in self.Atoms:
