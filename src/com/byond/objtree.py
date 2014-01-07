@@ -385,8 +385,8 @@ class ObjectTree:
                 path = '/'.join(self.cpath)
                 # if len(self.cpath) > 0 and 'proc' in self.cpath:
                 #    continue
-                if 'proc' in self.cpath:
-                    continue
+                #if 'proc' in self.cpath:
+                #    continue
                 if '=' in line or line.strip().startswith('var/'):
                     if path not in self.Atoms:
                         self.Atoms[path] = Atom(path)

@@ -152,15 +152,25 @@ class Atom:
     def __lt__(self, other):
         if 'layer' not in self.properties or 'layer' not in other.properties:
             return False
-        myLayer = float(self.properties['layer'].value)
-        otherLayer = float(other.properties['layer'].value)
+        myLayer=0
+        otherLayer=0
+        try:
+            myLayer = float(self.properties['layer'].value)
+            otherLayer = float(other.properties['layer'].value)
+        except ValueError:
+            pass
         return myLayer > otherLayer
         
     def __gt__(self, other):
         if 'layer' not in self.properties or 'layer' not in other.properties: 
             return False
-        myLayer = float(self.properties['layer'].value)
-        otherLayer = float(other.properties['layer'].value)
+        myLayer=0
+        otherLayer=0
+        try:
+            myLayer = float(self.properties['layer'].value)
+            otherLayer = float(other.properties['layer'].value)
+        except ValueError:
+            pass
         return myLayer < otherLayer
     
     def MapSerialize(self, flags=0):

@@ -4,6 +4,22 @@
 * This file defines the default state of datums.
 */
 
+/**
+* objtree can't parse global constants, so we use defines here.
+*/
+#ifdef __OBJTREE
+#define NORTH     1
+#define SOUTH     2
+#define EAST      4
+#define WEST      8
+#define NORTHEAST 5
+#define NORTHWEST 9
+#define SOUTHEAST 6
+#define SOUTHWEST 10
+#define UP        16
+#define DOWN      32
+#endif
+
 /
 	var/list/vars=list()
 	var/type=null
