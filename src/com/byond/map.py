@@ -608,10 +608,6 @@ class Map:
                 atoms += [self.atomCache[atom_chunk].copy()]
             else:
                 atom = self.consumeAtom(atom_chunk, lineNumber)
-                if '{' in atom_chunk:
-                    if len(atom.properties) == 0:
-                        logging.error('NO PROPERTIES READ FROM ' + atom_chunk + '!')
-                        sys.exit()
                 self.atomCache[atom_chunk] = atom.copy()
                 atoms += [atom]
             
@@ -709,6 +705,9 @@ class Map:
             pparts = chunk.split(' = ', 1)
             key = pparts[0].strip()
             value = pparts[1].strip()
+            if key == '':
+                logging.warn('Ignoring property with blank name. (given {0})'.format(chunk))
+                continue
             data = self.consumeDataValue(value, lineNumber)
             
             currentAtom.properties[key] = data
