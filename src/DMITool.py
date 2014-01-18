@@ -175,11 +175,11 @@ def compare(theirsfile, minefile, parser, reportstream):
 		reportstream.write('\n--- {0}'.format(theirsfile))
 		reportstream.write('\n+++ {0}'.format(minefile))
 		reportstream.write(o)
-		#if len(new2mine.states)>0:
-		#	new2mine.save(new2mineFilename)
-		#else:
-		#	if os.path.isfile(new2mineFilename):
-		#		os.remove(new2mineFilename)
+		if len(new2mine.states)>0:
+			new2mine.save(new2mineFilename)
+		else:
+			if os.path.isfile(new2mineFilename):
+				os.remove(new2mineFilename)
 	
 
 def disassemble_all(in_dir, out_dir, parser):
