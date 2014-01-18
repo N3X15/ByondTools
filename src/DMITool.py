@@ -76,7 +76,7 @@ class ModeAction(argparse.Action):
 def get_dmi_data(path, dest, parser):
 	if(os.path.isfile(path)):
 		dmi = DMI(path)
-		with open(dest,'w') as f:
+		with open(dest, 'w') as f:
 			f.write(dmi.getHeader())
 				
 def set_dmi_data(path, headerFile, parser):
@@ -116,14 +116,14 @@ def disassemble(path, to, parser):
 			print("Received error, continuing: %s" % traceback.format_exc())
 
 def compare(theirsfile, minefile, parser, reportstream):
-	#print('\tD %s -> %s' % (theirsfile, minefile))
+	# print('\tD %s -> %s' % (theirsfile, minefile))
 	theirs = []
-	theirsDMI=None
+	theirsDMI = None
 	mine = []
-	mineDMI=None
+	mineDMI = None
 	states = []
 	
-	new2mineFilename=minefile.replace('.dmi','.new.dmi')
+	new2mineFilename = minefile.replace('.dmi', '.new.dmi')
 	new2mine = DMI(new2mineFilename)
 	
 	o = ''
@@ -139,7 +139,7 @@ def compare(theirsfile, minefile, parser, reportstream):
 			sys.exit(1)
 		except Exception as e:
 			print("Received error, continuing: %s" % traceback.format_exc())
-			o += "\n {0}: Received error, continuing: {1}".format(theirsfile,traceback.format_exc())
+			o += "\n {0}: Received error, continuing: {1}".format(theirsfile, traceback.format_exc())
 		for stateName in theirs:
 			if stateName not in states:
 				states.append(stateName)
@@ -155,7 +155,7 @@ def compare(theirsfile, minefile, parser, reportstream):
 			sys.exit(1)
 		except Exception as e:
 			print("Received error, continuing: %s" % traceback.format_exc())
-			o += "\n {0}: Received error, continuing: {1}".format(minefile,traceback.format_exc())
+			o += "\n {0}: Received error, continuing: {1}".format(minefile, traceback.format_exc())
 		for stateName in mine:
 			if stateName not in states:
 				states.append(stateName)
@@ -164,18 +164,18 @@ def compare(theirsfile, minefile, parser, reportstream):
 		inMine = state in mine 
 		if inTheirs and not inMine:
 			o += '\n + {1}'.format(minefile, state)
-			new2mine.states[state]=theirsDMI.states[state]
+			new2mine.states[state] = theirsDMI.states[state]
 		elif not inTheirs and inMine:
 			o += '\n - {1}'.format(theirsfile, state)
 		elif inTheirs and inMine:
 			if theirs[state].ToString() != mine[state].ToString():
-				o += '\n - {0}: {1}'.format(state,mine[state].ToString())
-				o += '\n + {0}: {1}'.format(state,theirs[state].ToString())
+				o += '\n - {0}: {1}'.format(state, mine[state].ToString())
+				o += '\n + {0}: {1}'.format(state, theirs[state].ToString())
 	if o != '': 
 		reportstream.write('\n--- {0}'.format(theirsfile))
 		reportstream.write('\n+++ {0}'.format(minefile))
 		reportstream.write(o)
-		if len(new2mine.states)>0:
+		if len(new2mine.states) > 0:
 			new2mine.save(new2mineFilename)
 		else:
 			if os.path.isfile(new2mineFilename):

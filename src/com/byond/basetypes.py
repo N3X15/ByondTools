@@ -10,7 +10,7 @@ OBJ_LAYER = 3
 MOB_LAYER = 4
 FLY_LAYER = 5
 
-import yaml, re
+import re
 REGEX_TABS = re.compile('^(?P<tabs>\t*)') 
 class BYONDValue:
     """
