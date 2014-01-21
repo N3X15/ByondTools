@@ -152,8 +152,8 @@ class Atom:
     def __lt__(self, other):
         if 'layer' not in self.properties or 'layer' not in other.properties:
             return False
-        myLayer=0
-        otherLayer=0
+        myLayer = 0
+        otherLayer = 0
         try:
             myLayer = float(self.properties['layer'].value)
             otherLayer = float(other.properties['layer'].value)
@@ -164,8 +164,8 @@ class Atom:
     def __gt__(self, other):
         if 'layer' not in self.properties or 'layer' not in other.properties: 
             return False
-        myLayer=0
-        otherLayer=0
+        myLayer = 0
+        otherLayer = 0
         try:
             myLayer = float(self.properties['layer'].value)
             otherLayer = float(other.properties['layer'].value)
@@ -212,7 +212,7 @@ class Atom:
             prefix = ''
             if prop.declaration:
                 prefix = 'var'
-            if not prop.declaration and _type == '/':
+            if not prop.declaration:  # and _type == '/':
                 _type = ''
             o += '\t{prefix}{type}{name}'.format(prefix=prefix, type=_type, name=name)
             if prop.value is not None:
@@ -241,6 +241,8 @@ class Proc(Atom):
         Atom.__init__(self, path, filename, line)
         self.arguments = arguments
         self.code = []  # (indent, line)
+        self.definition = False
+        self.origpath = ''
         
     def CountTabs(self, line):
         m = REGEX_TABS.match(line)
@@ -263,7 +265,14 @@ class Proc(Atom):
         return
     
     def _DumpCode(self):
-        o = '\n' + self.path + '\n'
+        args = self.path[self.path.index('('):]
+        true_path = self.path[:self.path.index('(')].split('/')
+        name = true_path[-1]
+        true_path = true_path[:-1]
+        if self.definition:
+            true_path += ['proc']
+        true_path += [name + args]
+        o = '\n' + '/'.join(true_path) + '\n'
         min_indent = 0
         # Find minimum indent level
         for i in range(len(self.code)):
@@ -273,6 +282,12 @@ class Proc(Atom):
             break
         # Should be 1, so find the difference.
         indent_delta = 1 - min_indent
+        # o += '\t// true_path  = {0}\n'.format(repr(true_path))
+        # o += '\t// name       = {0}\n'.format(name)
+        # o += '\t// args       = {0}\n'.format(args)
+        # o += '\t// definition = {0}\n'.format(self.definition)
+        # o += '\t// path       = {0}\n'.format(self.path[:self.path.index('(')])
+        # o += '\t// origpath   = {0}\n'.format(self.origpath)
         # o += '\t// min_indent = {0}\n'.format(min_indent)
         # o += '\t// indent_delta = {0}\n'.format(indent_delta)
         for i in range(len(self.code)):

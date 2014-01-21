@@ -17,7 +17,7 @@ def debug(filename, line, path, message):
     print('{0}:{1}: {2} - {3}'.format(filename, line, '/'.join(path), message))
 
 class ObjectTree:
-    reserved_words = ('else', 'break', 'return', 'continue', 'spawn', 'proc')
+    reserved_words = ('else', 'break', 'return', 'continue', 'spawn')  # , 'proc')
     stdlib_files = (
         'dm_std.dm',
         'atom_defaults.dm'
@@ -124,15 +124,14 @@ class ObjectTree:
         # Things part of a string or list.
         if numtabs > 0 and atom.strip().startswith('/'):
             return
-        
-        # Was used to debug a weird path resolution issue with mecha boards.
-        # if line.strip()=='/obj/machinery/disposalpipe':
-        #    debugOn = True
+
         if self.debugOn: print('{} > {}'.format(numtabs, line.rstrip()))
         
         if numtabs == 0:
             self.cpath = atom_path
-            if self.cpath[0] != '':
+            if len(self.cpath) == 0:
+                self.cpath += ['']
+            elif self.cpath[0] != '':
                 self.cpath.insert(0, '')
             self.popLevels = [len(self.cpath)]
             if self.debugOn: debug(filename, ln, self.cpath, '0 - ' + repr(atom_path))
@@ -163,12 +162,31 @@ class ObjectTree:
             if self.debugOn: print('popLevels: ' + repr(self.popLevels))
             if self.debugOn: debug(filename, ln, self.cpath, '==')
             
-        npath = '/'.join(self.cpath)
+        origpath = '/'.join(self.cpath)
+        # print(npath)
+        
+        # definition?
+        defs = []
+        
+        # Trim off /proc or /var, if needed.
+        prep_path = list(self.cpath)
+        
+        for special in ['proc']:
+            if special in prep_path:
+                defs += [special]
+                prep_path.remove(special)
+        
+        npath = '/'.join(prep_path)
+        
         if npath not in self.Atoms:
             if procArgs is not None:
-                # print(npath)
                 assert npath.endswith(')')
-                self.Atoms[npath] = Proc(npath, procArgs, filename, ln)
+                #if origpath != npath:
+                #    print(origpath,proc_def)
+                proc = Proc(npath, procArgs, filename, ln)
+                proc.origpath = origpath
+                proc.definition = 'proc' in defs
+                self.Atoms[npath] = proc
             else:
                 self.Atoms[npath] = Atom(npath, filename, ln)
             # if self.debugOn: print('Added ' + npath)
@@ -187,7 +205,6 @@ class ObjectTree:
             # self.loadingProc.AddCode(i, '/* {0} */ {1}'.format(i,code.strip()))
             self.loadingProc.AddCode(i, code.rstrip())
             
-        
     def finishComment(self, line, **args):
         self.comments += [self.comment]
         self.fileLayout += [('COMMENT', len(self.comments) - 1)]
@@ -215,7 +232,7 @@ class ObjectTree:
             
             for line in f:
                 ln += 1
-                
+
                 skipNextChar = False
                 nl = ''
                     
@@ -385,7 +402,7 @@ class ObjectTree:
                 path = '/'.join(self.cpath)
                 # if len(self.cpath) > 0 and 'proc' in self.cpath:
                 #    continue
-                #if 'proc' in self.cpath:
+                # if 'proc' in self.cpath:
                 #    continue
                 if '=' in line or line.strip().startswith('var/'):
                     if path not in self.Atoms:
