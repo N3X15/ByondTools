@@ -47,6 +47,7 @@ class Tile:
         self.frame = None
         self.unselected_frame = None
         self.selectedArea = True
+        self.log = logging.getLogger(__name__+'.Tile')
     
     def ID2String(self, pad=0):
         o = ''
@@ -250,6 +251,8 @@ class Map:
         self.tree = tree
         self.generatedTexAtlas = False
         self.selectedAreas = ()
+        
+        self.log = logging.getLogger(__name__+'.Map')
 
         self.duplicates = 0
         self.tileChunk2ID = {}
@@ -330,7 +333,7 @@ class Map:
                 if height == 0:
                     height = y
                 self.zLevels[z] = zLevel
-                print('Added map layer {0} ({1}x{2})'.format(z, height, width))
+                self.log.info('Added map layer {0} ({1}x{2})'.format(z, height, width))
                 continue
             if inZLevel:
                 if width == 0:
@@ -413,14 +416,14 @@ class Map:
                             pass
                         
                     if dmi.img is None:
-                        logging.warning('Unable to open {0}!'.format(dmi_path))
+                        self.log.warn('Unable to open {0}!'.format(dmi_path))
                         continue
                     
                     if dmi.img.mode not in ('RGBA', 'P'):
-                        print('WARNING: {} is mode {}!'.format(dmi_file, dmi.img.mode))
+                        self.log.warn('{} is mode {}!'.format(dmi_file, dmi.img.mode))
                         
                     if direction not in IMAGE_INDICES:
-                        print('WARNING: Unrecognized direction {} on atom {} in tile {}!'.format(direction, atom.MapSerialize(), tile.origID))
+                        self.log.warn('Unrecognized direction {} on atom {} in tile {}!'.format(direction, atom.MapSerialize(), tile.origID))
                         direction = SOUTH  # DreamMaker property editor shows dir = 2.  WTF?
                         
                     frame = dmi.getFrame(state, direction, 0)
@@ -563,10 +566,11 @@ class Map:
                 self.idlen = max(self.idlen, len(t.ID2String()))
                 self.oldID2NewID[t.origID] = t.ID
                 index += 1
-                if((index % 100) == 0):
-                    print(index)
+                # No longer needed, 2fast.
+                #if((index % 100) == 0):
+                #    print(index)
             else:
-                print('-- {} tiles loaded, {} duplicates discarded'.format(index, self.duplicates))
+                self.log.info('-- {} tiles loaded, {} duplicates discarded'.format(index, self.duplicates))
                 return 
     
     def consumeTile(self, line, lineNumber):
@@ -576,7 +580,7 @@ class Map:
         
         if tileChunk in self.tileChunk2ID:
             tid = self.tileChunk2ID[tileChunk]
-            print('{} duplicate of {}! Installing redirect...'.format(t.origID, tid))
+            self.log.warn('{} duplicate of {}! Installing redirect...'.format(t.origID, tid))
             self.oldID2NewID[t.origID] = tid
             self.duplicates += 1
             return self.tileTypes[tid]
@@ -689,39 +693,56 @@ class Map:
     
     def consumeAtom(self, line, lineNumber):
         if '{' not in line:
-            currentAtom = self.GetAtom(line.strip())
+            atom = line.strip()
+            if atom.endswith('/'):
+                self.log.warn('{file}:{line}: Malformed atom: {data} has ending slash.  Stripping slashes from right side.'.format(file=self.filename,line=lineNumber,data=atom))
+                atom=atom.rstrip('/')
+            currentAtom = self.GetAtom(atom)
             if currentAtom is not None:
                 return currentAtom.copy()
+            else:
+                self.log.critical('{file}:{line}: Failed to consumeAtom({data}):  Unable to locate atom.'.format(file=self.filename,line=lineNumber,data=line))
+                return None
         chunks = line.split('{')
-        currentAtom = self.GetAtom(chunks[0].strip())
+        if len(chunks) < 2:
+            self.log.error('{file}:{line}: Something went wrong in consumeAtom(). line={data}'.format(file=self.filename,line=lineNumber,data=line))
+        atom=chunks[0].strip()
+        if atom.endswith('/'):
+            self.log.warn('{file}:{line}: Malformed atom: {data} has ending slash.  Stripping slashes from right side.'.format(file=self.filename,line=lineNumber,data=atom))
+            atom=atom.rstrip('/')
+        currentAtom = self.GetAtom(atom)
         if currentAtom is not None:
             currentAtom = currentAtom.copy()
+        else:
+            return None
         if chunks[1].endswith('}'):
             chunks[1] = chunks[1][:-1]
         property_chunks = self.SplitProperties(chunks[1])
+        mapSupplied=[]
         for chunk in property_chunks:
             if chunk.endswith('}'):
                 chunk = chunk[:-1]
-            pparts = chunk.split(' = ', 1)
+            pparts = chunk.split('=', 1)
             key = pparts[0].strip()
             value = pparts[1].strip()
             if key == '':
-                logging.warn('Ignoring property with blank name. (given {0})'.format(chunk))
+                self.log.warn('Ignoring property with blank name. (given {0})'.format(chunk))
                 continue
             data = self.consumeDataValue(value, lineNumber)
-            
-            currentAtom.properties[key] = data
             if key not in currentAtom.mapSpecified:
-                currentAtom.mapSpecified += [key]
+                mapSupplied+=[key]
+            currentAtom.properties[key] = data
+        
+        currentAtom.mapSpecified = mapSupplied
                 
         # Compare to base
         if not (self.readFlags & Map.READ_NO_BASE_COMP):
             base_atom = self.GetAtom(currentAtom.path)
             assert base_atom != None
-            for key in base_atom.properties.keys():
-                val = base_atom.properties[key]
-                if key not in currentAtom.properties:
-                    currentAtom.properties[key] = val
+            #for key in base_atom.properties.keys():
+            #    val = base_atom.properties[key]
+            #    if key not in currentAtom.properties:
+            #        currentAtom.properties[key] = val
             for key in currentAtom.properties.iterkeys():
                 val = currentAtom.properties[key].value
                 if key in base_atom.properties and val == base_atom.properties[key].value:

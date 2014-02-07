@@ -7,6 +7,7 @@ fixMap.py map.dmm replacements.txt
 """
 import sys
 from com.byond.map import Map
+from com.byond.objtree import ObjectTree
 from com.byond.basetypes import BYONDString, BYONDValue, Atom, PropertyFlags
 
 class Matcher:
@@ -15,6 +16,9 @@ class Matcher:
     
     def Fix(self, atom):
         return atom
+    
+    def SetTree(self, tree):
+        self.tree = tree
     
 class RenameProperty(Matcher):
     def __init__(self, old, new):
@@ -47,12 +51,12 @@ class RenameProperty(Matcher):
     
 class StandardizeManifolds(Matcher):
     STATE_TO_TYPE = {
+        'manifold-b'  :'/obj/machinery/atmospherics/pipe/manifold/supply/visible',
         'manifold-b-f':'/obj/machinery/atmospherics/pipe/manifold/supply/hidden',
+        'manifold-r'  :'/obj/machinery/atmospherics/pipe/manifold/scrubbers/visible',
         'manifold-r-f':'/obj/machinery/atmospherics/pipe/manifold/scrubbers/hidden',
-        'manifold-f':'/obj/machinery/atmospherics/pipe/manifold/general/hidden',
-        'manifold-b':'/obj/machinery/atmospherics/pipe/manifold/supply/visible',
-        'manifold-r':'/obj/machinery/atmospherics/pipe/manifold/scrubbers/visible',
-        'manifold':'/obj/machinery/atmospherics/pipe/manifold/general/visible',
+        'manifold'    :'/obj/machinery/atmospherics/pipe/manifold/general/visible',
+        'manifold-f'  :'/obj/machinery/atmospherics/pipe/manifold/general/hidden',
     }
     def __init__(self):
         return
@@ -84,7 +88,7 @@ class StandardizeInsulatedPipes(Matcher):
         if atom.path == '/obj/machinery/atmospherics/pipe/simple/insulated':
             return True
         if atom.path.startswith('/obj/machinery/atmospherics/pipe/simple/insulated') and int(atom.getProperty('dir', 0)) in (3, 8, 12):
-            #print(atom.MapSerialize())
+            # print(atom.MapSerialize())
             return True
         return False
     
@@ -211,6 +215,98 @@ class FixNetwork(Matcher):
     
     def __str__(self):
         return 'Changed network property to list'
+
+class NukeTags(Matcher):
+    def __init__(self):
+        pass
+    
+    def Matches(self, atom):
+        return 'tag' in atom.properties and 'tag' in atom.mapSpecified
+    
+    def Fix(self, atom):
+        atom.mapSpecified.remove('tag')
+        return atom
+    
+    def __str__(self):
+        return 'Removed tag'
+
+class StandardizeAPCs(Matcher):
+    ACT_CLEAR_NAME = 1
+    ACT_FIX_OFFSET = 2
+    def __init__(self):
+        self.actions = 0
+        self.pixel_x = 0
+        self.pixel_y = 0
+        
+    def Matches(self, atom):
+        self.actions = 0
+        if atom.path == '/obj/machinery/power/apc':
+            if 'name' in atom.properties and 'name' in atom.mapSpecified:
+                self.actions |= self.ACT_CLEAR_NAME
+                
+            direction = int(atom.getProperty('dir', 2))
+            self.pixel_x = 0
+            self.pixel_y = 0
+            c_pixel_x = atom.getProperty('pixel_x', 0)
+            c_pixel_y = atom.getProperty('pixel_y', 0)
+            if (direction & 3):
+                self.pixel_x = 0
+                if(direction == 1): 
+                    self.pixel_y = 24 
+                else:
+                    self.pixel_y = -24
+            else:
+                if(direction == 4): 
+                    self.pixel_x = 24 
+                else:
+                    self.pixel_x = -24
+                self.pixel_y = 0
+            if self.pixel_x != c_pixel_x or self.pixel_y != c_pixel_y:
+                self.actions |= self.ACT_FIX_OFFSET
+        return self.actions != 0
+    
+    def Fix(self, atom):
+        if self.actions & self.ACT_CLEAR_NAME:
+            atom.mapSpecified.remove('name')
+        if self.actions & self.ACT_FIX_OFFSET:
+            atom.setProperty('pixel_x', self.pixel_x, PropertyFlags.MAP_SPECIFIED)
+            atom.setProperty('pixel_y', self.pixel_y, PropertyFlags.MAP_SPECIFIED)
+        return atom
+    
+    def __str__(self):
+        if self.actions == 0:
+            return 'APC Standardization'
+        descr = []
+        if self.actions & self.ACT_CLEAR_NAME:
+            descr += ['Cleared name property']
+        if self.actions & self.ACT_FIX_OFFSET:
+            descr += ['Set pixel offset to {0},{1}'.format(self.pixel_x, self.pixel_y)]
+        return 'Standardized APC: ' + ', '.join(descr)
+
+atomsToFix = {}
+class FixIDTags(Matcher):
+    def __init__(self):
+        pass
+    
+    def Matches(self, atom):
+        global atomsToFix
+        if 'id_tag' in atom.properties:
+            compiled_atom = self.tree.GetAtom(atom.path)
+            if 'id_tag' not in compiled_atom.properties:
+                atomsToFix[atom.path] = True
+        return 'id' in atom.properties and 'id' in atom.mapSpecified
+        # return False
+    
+    def Fix(self, atom):
+        id = atom.properties['id']
+        id_idx = atom.mapSpecified.index('id')
+        atom.properties['id_tag'] = id
+        del atom.properties['id']
+        atom.mapSpecified[id_idx] = 'id_tag'
+        return atom
+    
+    def __str__(self):
+        return 'Renamed id to id_tag'
     
 
 actions = [
@@ -228,7 +324,11 @@ actions = [
     StandardizeInsulatedPipes(),
     
     # Standardize vault flooring
-    FixVaultFloors()
+    FixVaultFloors(),
+    
+    FixIDTags(),
+    NukeTags(),
+    StandardizeAPCs()
 ]
 with open(sys.argv[2], 'r') as repl:
     for line in repl:
@@ -251,13 +351,16 @@ print('Changes to make:')
 for action in actions:
     print(' * ' + str(action))
 
-dmm = Map()
+tree = ObjectTree()
+tree.ProcessFilesFromDME('baystation12.dme')
+dmm = Map(tree)
 dmm.readMap(sys.argv[1])
 for tid in xrange(len(dmm.tileTypes)):
     tile = dmm.tileTypes[tid]
     changes = []
     for i in xrange(len(tile.data)):
         for action in actions:
+            action.SetTree(tree)
             if action.Matches(tile.data[i]):
                 tile.data[i] = action.Fix(tile.data[i])
                 changes += [str(action)]
@@ -265,5 +368,7 @@ for tid in xrange(len(dmm.tileTypes)):
         print(tile.origID + ':')
         for change in changes:
             print(' * ' + change)
+for atom, _ in atomsToFix.items():
+    print('Atom {0} needs id_tag.'.format(atom))
 print('--- Saving...')
 dmm.writeMap(sys.argv[1] + '.fixed', Map.WRITE_OLD_IDS)        
