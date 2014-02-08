@@ -14,19 +14,35 @@ import re
 REGEX_TABS = re.compile('^(?P<tabs>\t*)') 
 class BYONDValue:
     """
-    Just to format file references differently.
+    Handles numbers and unhandled types like lists.
     """
     def __init__(self, string, filename='', line=0, typepath='/', **kwargs):
+        #: The actual value.
         self.value = string
+        
+        #: Filename this was found in
         self.filename = filename
+        
+        #: Line of the originating file.
         self.line = line
+        
+        #: Typepath of the value.
         self.type = typepath
+        
+        #: Has this value been inherited?
         self.inherited = kwargs.get('inherited', False)
+        
+        #: Is this a declaration? (/var)
         self.declaration = kwargs.get('declaration', False)
+        
+        #: Anything special? (global, const, etc.)
         self.special = kwargs.get('special', None)
+        
+        #: If a list, what's the size?
         self.size = kwargs.get('size', None)
         
     def copy(self):
+        '''Make a clone of this without dangling references.'''
         return BYONDValue(self.value, self.filename, self.line, self.type, declaration=self.declaration, inherited=self.inherited, special=self.special)
     
     def __str__(self):
@@ -36,6 +52,11 @@ class BYONDValue:
         return '<BYONDValue value="{}" filename="{}" line={}>'.format(self.value, self.filename, self.line)
     
     def DumpCode(self, name):
+        '''
+        Try to dump valid BYOND code for this variable.
+        
+        .. :param name: The name of this variable.
+        '''
         decl = []
         if self.declaration:
             decl += ['var']
@@ -65,7 +86,7 @@ class BYONDFileRef(BYONDValue):
 
 class BYONDString(BYONDValue):
     """
-    Just to format file references differently.
+    Correctly formats strings.
     """
     def __init__(self, string, filename='', line=0, **kwargs):
         BYONDValue.__init__(self, string, filename, line, '/', **kwargs)
@@ -80,24 +101,65 @@ class BYONDString(BYONDValue):
         return '<BYONDString value="{}" filename="{}" line={}>'.format(self.value, self.filename, self.line)
     
 class PropertyFlags:
+    '''Collection of flags that affect :func:`Atom.setProperty` behavior.'''
+    
+    #: Property being set should be saved to the map
     MAP_SPECIFIED = 1
+    
+    #: Property being set should be handled as a string
     STRING = 2
+    
+    #: Property being set should be handled as a file reference
     FILEREF = 4
+    
+    #: Property being set should be handled as a value
     VALUE = 8
+    
 class Atom:
+    '''
+    An atom is, in simple terms, what BYOND considers a class.
+    
+    :param string path:
+        The absolute path of this atom.  ex: */obj/item/weapon/gun*
+    :param string filename:
+        The file this atom originated from.
+    :param int line:
+        The line in the aforementioned file.
+    '''
+
+    # I forgot what the hell this did.
     FLAG_INHERITED_PROPERTIES = 1
+    
     def __init__(self, path, filename='', line=0):
         global TURF_LAYER, AREA_LAYER, OBJ_LAYER, MOB_LAYER
         
+        #: Absolute path of this atom
         self.path = path
+        
+        #: Vars of this atom, including inherited vars.
         self.properties = {}
+        
+        #: List of var names that were specified by the map, if atom was loaded from a :class:`com.byond.map.Map`.
         self.mapSpecified = []
+        
+        #: Child atoms and procs.
         self.children = {}
+        
+        #: The parent of this atom.
         self.parent = None
+        
+        #: The file this atom originated from.
         self.filename = filename
+        
+        #: Line from the originating file.
         self.line = line
         
     def copy(self):
+        '''
+        Make a copy of this atom, without dangling references.
+        
+        :returns com.byond.map.Map
+        '''
         new_node = Atom(self.path)
         new_node.properties = self.properties.copy()
         new_node.mapSpecified = self.mapSpecified
@@ -105,12 +167,52 @@ class Atom:
         return new_node
     
     def getProperty(self, index, default=None):
+        '''
+        Get the value of the specified property.
+        
+        :param string index:
+            The name of the var we want.
+        :param mixed default:
+            Default value, if the var cannot be found.
+        :returns:
+            The desired value.
+        '''
         prop = self.properties.get(index, None)
         if prop == None:
             return default
         return prop.value
     
     def setProperty(self, index, value, flags=0):
+        '''
+        Set the value of a property.
+        
+        In the event the property cannot be found, a new property is added.
+        
+        This function will attempt to convert python types to BYOND types.  
+        Hints can be provided in the form of PropertyFlags given to *flags*.
+        
+        :param string index:
+            The name of the var desired.
+        :param mixed value:
+            The new value.
+        :param int flags:
+            Changes value assignment behavior.
+            
+            +------------------------------------+------------------------------------------------+
+            | Flag                               | Effect                                         |
+            +====================================+================================================+
+            | :attr:`PropertyFlag.MAP_SPECIFIED` | Adds the property to *mapSpecified*, if needed.|
+            +------------------------------------+------------------------------------------------+
+            | :attr:`PropertyFlag.STRING`        | Forces conversion of value to a BYONDString.   |
+            +------------------------------------+------------------------------------------------+
+            | :attr:`PropertyFlag.FILEREF`       | Forces conversion of value to a BYONDFileRef.  |
+            +------------------------------------+------------------------------------------------+
+            | :attr:`PropertyFlag.VALUE`         | Forces conversion of value to a BYONDValue.    |
+            +------------------------------------+------------------------------------------------+
+            
+        :returns:
+            The desired value.
+        '''
         if flags & PropertyFlags.MAP_SPECIFIED:
             if index not in self.mapSpecified:
                 self.mapSpecified += [index]
