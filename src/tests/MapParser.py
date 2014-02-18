@@ -25,17 +25,35 @@ class MapParserTest(unittest.TestCase):
         self.assertListEqual(out, expectedOutput)
     
     def test_basic_consumeTile_operation(self):
+        '''
+        "aaK" = (
+            /obj/structure/cable{
+                d1 = 1;
+                d2 = 2; 
+                icon_state = "1-2";
+                tag = ""
+            },
+            /obj/machinery/atmospherics/pipe/simple/supply/hidden{
+                dir = 4
+            },
+            /turf/simulated/floor{
+                icon_state = "floorgrime"
+            },
+            /area/security/prison
+        )
+        '''
         testStr = '"aaK" = (/obj/structure/cable{d1 = 1; d2 = 2; icon_state = "1-2"; tag = ""},/obj/machinery/atmospherics/pipe/simple/supply/hidden{dir = 4},/turf/simulated/floor{icon_state = "floorgrime"},/area/security/prison)'
         out = self.dmm.consumeTile(testStr, 0)
-        
+        print('IIDs: {0}'.format(repr(out.instances)))
+
         self.assertEquals(out.origID, 'aaK', 'origID')
-        self.assertEquals(len(out.data), 4, 'data size')
-        self.assertEquals(len(out.data[0].properties), 4, 'data[0] properties')
-        self.assertIn('d1', out.data[0].properties, 'origID incorrect')
-        self.assertListEqual(out.data[0].mapSpecified,['d1','d2','icon_state','tag'])
+        self.assertEquals(len(out.instances), 4, 'instances size')
+        self.assertEquals(len(out.GetAtom(0).properties), 4, 'instances[0] properties')
+        self.assertIn('d1', out.GetAtom(0).properties, 'd1 not present in properties')
+        self.assertListEqual(out.GetAtom(0).mapSpecified,['d1','d2','icon_state','tag'])
         
-        self.assertEquals(len(out.data[2].properties), 1, 'Failure to parse /turf/simulated/floor{icon_state = "floorgrime"}')
-        self.assertIn('icon_state', out.data[2].properties, 'Failure to parse /turf/simulated/floor{icon_state = "floorgrime"}')
+        self.assertEquals(len(out.GetAtom(2).properties), 1, 'Failure to parse /turf/simulated/floor{icon_state = "floorgrime"}')
+        self.assertIn('icon_state', out.GetAtom(2).properties, 'Failure to parse /turf/simulated/floor{icon_state = "floorgrime"}')
         
         self.assertEqual(out.MapSerialize(Tile.FLAG_USE_OLD_ID), testStr)
         

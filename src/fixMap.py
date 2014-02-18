@@ -241,8 +241,16 @@ class StandardizeAPCs(Matcher):
     def Matches(self, atom):
         self.actions = 0
         if atom.path == '/obj/machinery/power/apc':
-            if 'name' in atom.properties and 'name' in atom.mapSpecified:
-                self.actions |= self.ACT_CLEAR_NAME
+            # Determine if this APC is pretty close to standard-issue (no weird permissions, etc).
+            nonstandard_settings = []
+            for setting in atom.mapSpecified:
+                if setting not in ('name', 'pixel_x', 'pixel_y', 'tag', 'dir'):
+                    nonstandard_settings += [setting]
+            if len(nonstandard_settings) > 0:
+                print('Non-standard APC: Has strange settings - ' + ', '.join(nonstandard_settings))
+            else:
+                if 'name' in atom.properties and 'name' in atom.mapSpecified:
+                    self.actions |= self.ACT_CLEAR_NAME
                 
             direction = int(atom.getProperty('dir', 2))
             self.pixel_x = 0
@@ -355,20 +363,20 @@ tree = ObjectTree()
 tree.ProcessFilesFromDME('baystation12.dme')
 dmm = Map(tree)
 dmm.readMap(sys.argv[1])
-for tid in xrange(len(dmm.tileTypes)):
-    tile = dmm.tileTypes[tid]
+for iid in xrange(len(dmm.instances)):
+    atom = dmm.getInstance(iid)
     changes = []
-    for i in xrange(len(tile.data)):
-        for action in actions:
-            action.SetTree(tree)
-            if action.Matches(tile.data[i]):
-                tile.data[i] = action.Fix(tile.data[i])
-                changes += [str(action)]
+    for action in actions:
+        action.SetTree(tree)
+        if action.Matches(atom):
+            action.Fix(atom)
+            changes += [str(action)]
     if len(changes) > 0:
-        print(tile.origID + ':')
+        print(atom.path + ':')
         for change in changes:
             print(' * ' + change)
 for atom, _ in atomsToFix.items():
     print('Atom {0} needs id_tag.'.format(atom))
 print('--- Saving...')
 dmm.writeMap(sys.argv[1] + '.fixed', Map.WRITE_OLD_IDS)        
+#dmm.writeMap2(sys.argv[1].replace('.dmm', '.dmm2'))

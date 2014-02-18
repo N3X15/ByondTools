@@ -34,14 +34,14 @@ def ProcessFile(filename):
     fuckups = []
     with open(filename, 'r') as f:
         lastID = ''
-        declaring=False
+        declaring = False
         lastLevel = 0
         lastWasAlert = False
         buffa = ''
         tempbuffa = ''
         tempfuckup = ''
         tempBackup = ''
-        origIndentLevel=0
+        origIndentLevel = 0
         ln = 0
         for line in f:
             ln += 1
@@ -51,7 +51,7 @@ def ProcessFile(filename):
                 ID = m.group('identifier')
                 content = m.group('content').strip()
                 indent = '\t' * level
-                #indentMore = '\t' * (level + 1)
+                # indentMore = '\t' * (level + 1)
                 if ID == lastID and level == lastLevel:
                     if not lastWasAlert:
                         buffa += '\n' + indent + '// AUTOFIXED BY fix_string_idiocy.py'
@@ -63,20 +63,20 @@ def ProcessFile(filename):
                     print(msg)
                     fuckups.append(msg)
                     buffa += '\n'
-                    #buffa += indentMore
+                    # buffa += indentMore
                     buffa += content
                     lastWasAlert = True
                 else:
                     if lastWasAlert:
                         buffa += '"}'
-                        buffa += '\n' + ('\t'*origIndentLevel) + '// END AUTOFIX'
+                        buffa += '\n' + ('\t' * origIndentLevel) + '// END AUTOFIX'
                         buffa += '\n'
                         lastWasAlert = False
                     if tempBackup != '':
                         buffa += tempBackup
                     tempBackup = line
                     tempbuffa = indent
-                    origIndentLevel=level
+                    origIndentLevel = level
                     if m.group('declaration') is None:
                         tempbuffa += '{0} {2}= {{"{1}'.format(ID, content, m.group('operator'))
                     else:
@@ -100,9 +100,10 @@ def ProcessFile(filename):
                 lastID = ''
                 lastLevel = ''
                 buffa += line
-        fixpath = filename.replace('code' + os.sep, 'code-fixed' + os.sep)
-        fixpath = fixpath.replace('interface' + os.sep, 'interface-fixed' + os.sep)
-        fixpath = fixpath.replace('RandomZLevels' + os.sep, 'RandomZLevels-fixed' + os.sep)
+        fixpaths = ['code', 'interface', 'RandomZLevels', '_maps']
+        fixpath=filename
+        for fp in fixpaths:
+            fixpath = fixpath.replace(fp + os.sep, fp + '-fixed' + os.sep)
         if len(fuckups) > 0:
             if not os.path.isdir(os.path.dirname(fixpath)):
                 os.makedirs(os.path.dirname(fixpath))
@@ -110,6 +111,7 @@ def ProcessFile(filename):
                 fixes.write(buffa)
         else:
             if os.path.isfile(fixpath):
+                print('RM {0} ({1})'.format(fixpath,os.sep))
                 os.remove(fixpath)
         # print(' Processed - {0} lines.'.format(ln))
         return fuckups

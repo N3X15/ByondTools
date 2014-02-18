@@ -124,6 +124,8 @@ def compare(theirsfile, minefile, parser, reportstream):
 	states = []
 	
 	new2mineFilename = minefile.replace('.dmi', '.new.dmi')
+	if os.path.isfile(new2mineFilename):
+		os.remove(new2mineFilename)
 	new2mine = DMI(new2mineFilename)
 	
 	o = ''
@@ -180,7 +182,7 @@ def compare(theirsfile, minefile, parser, reportstream):
 		else:
 			if os.path.isfile(new2mineFilename):
 				os.remove(new2mineFilename)
-	
+				#print('RM {0}'.format(new2mineFilename))
 
 def disassemble_all(in_dir, out_dir, parser):
 	print('D_A %s -> %s' % (in_dir, out_dir))

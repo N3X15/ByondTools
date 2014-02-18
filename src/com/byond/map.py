@@ -40,14 +40,15 @@ class Tile:
     FLAG_USE_OLD_ID = 1
     FLAG_INHERITED_PROPERTIES = 2
     
-    def __init__(self):
+    def __init__(self, _map):
         self.origID = ''
         self.ID = 0
-        self.data = []
+        self.instances = []
         self.frame = None
         self.unselected_frame = None
         self.selectedArea = True
-        self.log = logging.getLogger(__name__+'.Tile')
+        self.log = logging.getLogger(__name__ + '.Tile')
+        self.map = _map
     
     def ID2String(self, pad=0):
         o = ''
@@ -63,6 +64,19 @@ class Tile:
             o = o.rjust(pad, ID_ENCODING_TABLE[0])
         return o
     
+    def GetAtoms(self):
+        atoms = []
+        for instance in self.instances:
+            atoms += [self.map.getInstance(instance)]
+        return atoms
+    
+    def GetAtom(self, idx):
+        print(repr(self.instances))
+        return self.map.getInstance(self.instances[idx])
+    
+    def GetInstances(self):
+        return self.instances
+    
     def __str__(self):
         return self.MapSerialize(Tile.FLAG_USE_OLD_ID)
         
@@ -72,8 +86,10 @@ class Tile:
         atomFlags = 0
         if flags & Tile.FLAG_INHERITED_PROPERTIES:
             atomFlags |= Atom.FLAG_INHERITED_PROPERTIES
-        for i in xrange(len(self.data)):
-            atom = self.data[i]
+        for i in xrange(len(self.instances)):
+            iid = self.instances[i]
+            print('{0} = {1}'.format(repr(i), repr(iid)))
+            atom = self.map.getInstance(iid)
             if atom.path != '':
                 atoms += [atom.MapSerialize(atomFlags)]
         if not (flags & Tile.FLAG_USE_OLD_ID):
@@ -82,18 +98,18 @@ class Tile:
             return '"{ID}" = ({atoms})'.format(ID=self.origID, atoms=','.join(atoms))
     
     def __eq__(self, other):
-        if len(self.data) != len(other.data):
+        if len(self.instances) != len(other.instances):
             return False
         else:
-            return all(self.data[i] == other.data[i] for i in range(len(self.data)))
+            return all(self.instances[i] == other.instances[i] for i in xrange(len(self.instances)))
         
     def RenderToMapTile(self, passnum, basedir, renderflags):
         img = Image.new('RGBA', (96, 96))
         self.offset = (32, 32)
         foundAPixelOffset = False
-        for atom in sorted(self.data, reverse=True):
+        for atom in sorted(self.GetAtoms(), reverse=True):
             
-            aid = self.data.index(atom)
+            aid = atom.id
             # Ignore /areas.  They look like ass.
             if atom.path.startswith('/area'):
                 if not (renderflags & MapRenderFlags.RENDER_AREAS):
@@ -242,6 +258,7 @@ class Map:
         self.filename = 'Unknown'
         self.readFlags = 0
         self.tileTypes = []
+        self.instances = []
         self.zLevels = {}
         self.oldID2NewID = {}
         self.DMIs = {}
@@ -252,7 +269,7 @@ class Map:
         self.generatedTexAtlas = False
         self.selectedAreas = ()
         
-        self.log = logging.getLogger(__name__+'.Map')
+        self.log = logging.getLogger(__name__ + '.Map')
 
         self.duplicates = 0
         self.tileChunk2ID = {}
@@ -359,9 +376,9 @@ class Map:
             tile.offset = (32, 32)
             tile.areaSelected = True
             tile.render_deferred = False
-            for atom in sorted(tile.data, reverse=True):
+            for atom in sorted(tile.GetAtoms(), reverse=True):
                 
-                aid = tile.data.index(atom)
+                aid = atom.id
                 # Ignore /areas.  They look like ass.
                 if atom.path.startswith('/area'):
                     if not (renderflags & MapRenderFlags.RENDER_AREAS):
@@ -472,7 +489,8 @@ class Map:
             tile = self.tileTypes[tid]
             tile.areaSelected = True
             if len(self.selectedAreas) > 0:
-                for atom in tile.data:
+                for iid in tile.instances:
+                    atom = self.instances[iid]
                     if atom.path.startswith('/area'):
                         if  atom.path not in self.selectedAreas:
                             tile.areaSelected = False
@@ -544,12 +562,6 @@ class Map:
                     os.makedirs(filedir)
                 print(' -> {} ({}x{})'.format(filename, zpic.size[0], zpic.size[1]))
                 zpic.save(filename, 'PNG')
-    
-    def cleanTile(self, t):
-        for i in xrange(len(t.data)):
-            if t.data[i] and 'tag' in t.data[i].properties:
-                del t.data[i].properties['tag']
-        return t
             
     def consumeTiles(self, f):
         index = 0
@@ -567,14 +579,14 @@ class Map:
                 self.oldID2NewID[t.origID] = t.ID
                 index += 1
                 # No longer needed, 2fast.
-                #if((index % 100) == 0):
+                # if((index % 100) == 0):
                 #    print(index)
             else:
                 self.log.info('-- {} tiles loaded, {} duplicates discarded'.format(index, self.duplicates))
                 return 
     
     def consumeTile(self, line, lineNumber):
-        t = Tile()
+        t = Tile(self)
         t.origID = self.consumeTileID(line)
         tileChunk = line.strip()[line.index('(') + 1:-1]
         
@@ -585,7 +597,7 @@ class Map:
             self.duplicates += 1
             return self.tileTypes[tid]
         
-        t.data = self.consumeTileAtoms(tileChunk, lineNumber)
+        t.instances = self.consumeTileAtoms(tileChunk, lineNumber)
         return t
     def getTileTypeID(self, t):
         for tile in self.tileTypes:
@@ -597,6 +609,9 @@ class Map:
         e = line.index('"', 1)
         return line[1:e]
     
+    def GetInstances(self):
+        return self.instances
+    
     # So we can read a map without parsing the tree.
     def GetAtom(self, path):
         if self.tree is not None:
@@ -604,18 +619,18 @@ class Map:
         return Atom(path)
     
     def consumeTileAtoms(self, line, lineNumber):
-        atoms = []
+        instances = []
         atom_chunks = self.SplitAtoms(line)
 
         for atom_chunk in atom_chunks:
             if atom_chunk in self.atomCache:
-                atoms += [self.atomCache[atom_chunk].copy()]
+                instances += [self.atomCache[atom_chunk]]
             else:
-                atom = self.consumeAtom(atom_chunk, lineNumber)
-                self.atomCache[atom_chunk] = atom.copy()
-                atoms += [atom]
+                atom_id = self.consumeAtom(atom_chunk, lineNumber)
+                self.atomCache[atom_chunk] = atom_id
+                instances += [atom_id]
             
-        return atoms
+        return instances
     
     def SplitProperties(self, string):
         o = []
@@ -695,21 +710,21 @@ class Map:
         if '{' not in line:
             atom = line.strip()
             if atom.endswith('/'):
-                self.log.warn('{file}:{line}: Malformed atom: {data} has ending slash.  Stripping slashes from right side.'.format(file=self.filename,line=lineNumber,data=atom))
-                atom=atom.rstrip('/')
+                self.log.warn('{file}:{line}: Malformed atom: {data} has ending slash.  Stripping slashes from right side.'.format(file=self.filename, line=lineNumber, data=atom))
+                atom = atom.rstrip('/')
             currentAtom = self.GetAtom(atom)
             if currentAtom is not None:
-                return currentAtom.copy()
+                return self.AssignIID(currentAtom)
             else:
-                self.log.critical('{file}:{line}: Failed to consumeAtom({data}):  Unable to locate atom.'.format(file=self.filename,line=lineNumber,data=line))
+                self.log.critical('{file}:{line}: Failed to consumeAtom({data}):  Unable to locate atom.'.format(file=self.filename, line=lineNumber, data=line))
                 return None
         chunks = line.split('{')
         if len(chunks) < 2:
-            self.log.error('{file}:{line}: Something went wrong in consumeAtom(). line={data}'.format(file=self.filename,line=lineNumber,data=line))
-        atom=chunks[0].strip()
+            self.log.error('{file}:{line}: Something went wrong in consumeAtom(). line={data}'.format(file=self.filename, line=lineNumber, data=line))
+        atom = chunks[0].strip()
         if atom.endswith('/'):
-            self.log.warn('{file}:{line}: Malformed atom: {data} has ending slash.  Stripping slashes from right side.'.format(file=self.filename,line=lineNumber,data=atom))
-            atom=atom.rstrip('/')
+            self.log.warn('{file}:{line}: Malformed atom: {data} has ending slash.  Stripping slashes from right side.'.format(file=self.filename, line=lineNumber, data=atom))
+            atom = atom.rstrip('/')
         currentAtom = self.GetAtom(atom)
         if currentAtom is not None:
             currentAtom = currentAtom.copy()
@@ -718,7 +733,7 @@ class Map:
         if chunks[1].endswith('}'):
             chunks[1] = chunks[1][:-1]
         property_chunks = self.SplitProperties(chunks[1])
-        mapSupplied=[]
+        mapSupplied = []
         for chunk in property_chunks:
             if chunk.endswith('}'):
                 chunk = chunk[:-1]
@@ -730,7 +745,7 @@ class Map:
                 continue
             data = self.consumeDataValue(value, lineNumber)
             if key not in currentAtom.mapSpecified:
-                mapSupplied+=[key]
+                mapSupplied += [key]
             currentAtom.properties[key] = data
         
         currentAtom.mapSpecified = mapSupplied
@@ -739,7 +754,7 @@ class Map:
         if not (self.readFlags & Map.READ_NO_BASE_COMP):
             base_atom = self.GetAtom(currentAtom.path)
             assert base_atom != None
-            #for key in base_atom.properties.keys():
+            # for key in base_atom.properties.keys():
             #    val = base_atom.properties[key]
             #    if key not in currentAtom.properties:
             #        currentAtom.properties[key] = val
@@ -749,7 +764,16 @@ class Map:
                     if key in currentAtom.mapSpecified:
                         currentAtom.mapSpecified.remove(key)
                         # print('Removed {0} from atom: Equivalent to base atom!')
-        return currentAtom
+                        
+        return self.AssignIID(currentAtom)
+                        
+    def AssignIID(self, atom):
+        if atom not in self.instances:
+            atom.id = len(self.instances)
+            self.instances.append(atom)
+            return atom.id
+        else:
+            return self.instances.index(atom)
             
     def consumeDataValue(self, value, lineNumber):
         data = None
@@ -763,3 +787,8 @@ class Map:
             data = BYONDValue(value, self.filename, lineNumber)
         return data
     
+
+    def getInstance(self, iid):
+        if iid is None:
+            return None
+        return self.instances[iid] 
