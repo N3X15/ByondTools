@@ -379,4 +379,4 @@ for atom, _ in atomsToFix.items():
     print('Atom {0} needs id_tag.'.format(atom))
 print('--- Saving...')
 dmm.writeMap(sys.argv[1] + '.fixed', Map.WRITE_OLD_IDS)        
-#dmm.writeMap2(sys.argv[1].replace('.dmm', '.dmm2'))
+dmm.writeMap2(sys.argv[1].replace('.dmm', '.dmm2'))

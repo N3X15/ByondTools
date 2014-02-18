@@ -80,7 +80,7 @@ class Tile:
     def __str__(self):
         return self.MapSerialize(Tile.FLAG_USE_OLD_ID)
         
-    def MapSerialize(self, flags=0):
+    def MapSerialize(self, flags=0, padding=0):
         # "aat" = (/obj/structure/grille,/obj/structure/window/reinforced{dir = 8},/obj/structure/window/reinforced{dir = 1},/obj/structure/window/reinforced,/obj/structure/cable{d1 = 2; d2 = 4; icon_state = "2-4"; tag = ""},/turf/simulated/floor/plating,/area/security/prison)
         atoms = []
         atomFlags = 0
@@ -88,14 +88,28 @@ class Tile:
             atomFlags |= Atom.FLAG_INHERITED_PROPERTIES
         for i in xrange(len(self.instances)):
             iid = self.instances[i]
-            print('{0} = {1}'.format(repr(i), repr(iid)))
+            # print('{0} = {1}'.format(repr(i), repr(iid)))
             atom = self.map.getInstance(iid)
             if atom.path != '':
-                atoms += [atom.MapSerialize(atomFlags)]
+                atoms += [atom.MapSerialize(atomFlags, padding)]
         if not (flags & Tile.FLAG_USE_OLD_ID):
-            return '"{ID}" = ({atoms})'.format(ID=self.ID2String(), atoms=','.join(atoms))
+            return '"{ID}" = ({atoms})'.format(ID=self.ID2String(padding=0), atoms=','.join(atoms))
         else:
             return '"{ID}" = ({atoms})'.format(ID=self.origID, atoms=','.join(atoms))
+        
+    def MapSerialize2(self, flags=0, padding=0):
+        '''
+        DMM2 serialization method.
+        '''
+        # "aat" = (/obj/structure/grille,/obj/structure/window/reinforced{dir = 8},/obj/structure/window/reinforced{dir = 1},/obj/structure/window/reinforced,/obj/structure/cable{d1 = 2; d2 = 4; icon_state = "2-4"; tag = ""},/turf/simulated/floor/plating,/area/security/prison)
+        atomFlags = 0
+        if flags & Tile.FLAG_INHERITED_PROPERTIES:
+            atomFlags |= Atom.FLAG_INHERITED_PROPERTIES
+        instancelist = ','.join([str(i) for i in self.GetInstances()])
+        if not (flags & Tile.FLAG_USE_OLD_ID):
+            return '"{ID}" = ({atoms})'.format(ID=self.ID2String(padding), atoms=instancelist)
+        else:
+            return '"{ID}" = ({atoms})'.format(ID=self.origID, atoms=instancelist)
     
     def __eq__(self, other):
         if len(self.instances) != len(other.instances):
@@ -302,9 +316,10 @@ class Map:
         tileFlags = 0
         if flags & Map.WRITE_OLD_IDS:
             tileFlags |= Tile.FLAG_USE_OLD_ID
+        padding = len(self.tileTypes[-1].ID2String())
         with open(filename, 'w') as f:
             for tile in self.tileTypes:
-                f.write('{0}\n'.format(tile.MapSerialize(tileFlags)))
+                f.write('{0}\n'.format(tile.MapSerialize(tileFlags, padding)))
             for z in self.zLevels.keys():
                 f.write('\n(1,1,{0}) = {{"\n'.format(z))
                 zlevel = self.zLevels[z]
@@ -314,7 +329,36 @@ class Map:
                         if flags & Map.WRITE_OLD_IDS:
                             f.write(tile.origID)
                         else:
-                            f.write(tile.ID2String(self.idlen))
+                            f.write(tile.ID2String(padding))
+                    f.write("\n")
+                f.write('"}\n')
+        
+    def writeMap2(self, filename, flags=0):
+        self.filename = filename
+        tileFlags = 0
+        atomFlags = 0
+        if flags & Map.WRITE_OLD_IDS:
+            tileFlags |= Tile.FLAG_USE_OLD_ID
+            atomFlags |= Atom.FLAG_USE_OLD_ID
+        padding = len(self.tileTypes[-1].ID2String())
+        with open(filename, 'w') as f:
+            f.write('// Atom Instances\n')
+            for atom in self.instances:
+                f.write('{0} = {1}\n'.format(atom.id, atom.MapSerialize(atomFlags)))
+            f.write('// Tiles\n')
+            for tile in self.tileTypes:
+                f.write('{0}\n'.format(tile.MapSerialize2(tileFlags, padding)))
+            f.write('// Layout\n')
+            for z in self.zLevels.keys():
+                f.write('\n(1,1,{0}) = {{"\n'.format(z))
+                zlevel = self.zLevels[z]
+                for y in xrange(zlevel.height):
+                    for x in xrange(zlevel.width):
+                        tile = zlevel.GetTileAt(x, y)
+                        if flags & Map.WRITE_OLD_IDS:
+                            f.write(tile.origID)
+                        else:
+                            f.write(tile.ID2String(padding))
                     f.write("\n")
                 f.write('"}\n')
                 
@@ -787,7 +831,6 @@ class Map:
             data = BYONDValue(value, self.filename, lineNumber)
         return data
     
-
     def getInstance(self, iid):
         if iid is None:
             return None

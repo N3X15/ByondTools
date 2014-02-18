@@ -127,8 +127,11 @@ class Atom:
         The line in the aforementioned file.
     '''
 
-    # I forgot what the hell this did.
+    #: Prints all inherited properties, not just the ones that are mapSpecified.
     FLAG_INHERITED_PROPERTIES = 1
+    
+    #: writeMap2 prints old_ids instead of the actual IID.
+    FLAG_USE_OLD_ID = 2  
     
     def __init__(self, path, filename='', line=0):
         global TURF_LAYER, AREA_LAYER, OBJ_LAYER, MOB_LAYER
@@ -154,8 +157,11 @@ class Atom:
         #: Line from the originating file.
         self.line = line
         
-        #: Instance ID (maps only)
+        #: Instance ID (maps only).  Used internally, do NOT change.
         self.id = None
+        
+        #: Instance ID that was read from the map.
+        self.old_id = None
         
     def copy(self):
         '''
