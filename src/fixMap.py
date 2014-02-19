@@ -9,6 +9,7 @@ import sys
 from com.byond.map import Map
 from com.byond.objtree import ObjectTree
 from com.byond.basetypes import BYONDString, BYONDValue, Atom, PropertyFlags
+from com.byond.directions import *
 
 class Matcher:
     def Matches(self, atom):
@@ -114,6 +115,28 @@ class StandardizeInsulatedPipes(Matcher):
     
     def __str__(self):
         return 'Standardized insulated pipe'
+    
+class FixWindows(Matcher):
+    def __init__(self):
+        return
+        
+    def Matches(self, atom):
+        if atom.path.startswith('/obj/structure/window/full'):
+            return False
+        if atom.path.startswith('/obj/structure/window') and int(atom.getProperty('dir', SOUTH)) in (NORTH|WEST,SOUTH|WEST,NORTH|EAST,SOUTH|EAST):
+            # print(atom.MapSerialize())
+            return True
+        return False
+    
+    def Fix(self, atom):
+        newtype = atom.path.replace('/obj/structure/window','/obj/structure/window/full')
+        atom.path=newtype
+        atom.properties={}
+        atom.mapSpecified=[]
+        return atom
+    
+    def __str__(self):
+        return 'Standardized full windows'
     
 class FixVaultFloors(Matcher):
     """
@@ -336,7 +359,8 @@ actions = [
     
     FixIDTags(),
     NukeTags(),
-    StandardizeAPCs()
+    StandardizeAPCs(),
+    FixWindows()
 ]
 with open(sys.argv[2], 'r') as repl:
     for line in repl:
@@ -362,21 +386,23 @@ for action in actions:
 tree = ObjectTree()
 tree.ProcessFilesFromDME('baystation12.dme')
 dmm = Map(tree)
-dmm.readMap(sys.argv[1])
+dmm.readMap(sys.argv[1])   
+dmm.writeMap2(sys.argv[1].replace('.dmm', '.dmm2'))
 for iid in xrange(len(dmm.instances)):
     atom = dmm.getInstance(iid)
     changes = []
     for action in actions:
         action.SetTree(tree)
         if action.Matches(atom):
-            action.Fix(atom)
+            atom=action.Fix(atom)
             changes += [str(action)]
+    atom
     if len(changes) > 0:
-        print(atom.path + ':')
+        print('{0} (#{1}):'.format(atom.path,atom.id))
         for change in changes:
             print(' * ' + change)
 for atom, _ in atomsToFix.items():
     print('Atom {0} needs id_tag.'.format(atom))
 print('--- Saving...')
 dmm.writeMap(sys.argv[1] + '.fixed', Map.WRITE_OLD_IDS)        
-dmm.writeMap2(sys.argv[1].replace('.dmm', '.dmm2'))
+dmm.writeMap2(sys.argv[1].replace('.dmm', '.dmm2') + '.fixed')

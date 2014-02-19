@@ -91,9 +91,9 @@ class Tile:
             # print('{0} = {1}'.format(repr(i), repr(iid)))
             atom = self.map.getInstance(iid)
             if atom.path != '':
-                atoms += [atom.MapSerialize(atomFlags, padding)]
+                atoms += [atom.MapSerialize(atomFlags)]
         if not (flags & Tile.FLAG_USE_OLD_ID):
-            return '"{ID}" = ({atoms})'.format(ID=self.ID2String(padding=0), atoms=','.join(atoms))
+            return '"{ID}" = ({atoms})'.format(ID=self.ID2String(padding), atoms=','.join(atoms))
         else:
             return '"{ID}" = ({atoms})'.format(ID=self.origID, atoms=','.join(atoms))
         
