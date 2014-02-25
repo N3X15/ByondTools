@@ -143,7 +143,7 @@ class Tile:
             if len(render_types) > 0:
                 found=False
                 for path in render_types:
-                    if path.startswith(atom.path):
+                    if atom.path.startswith(path):
                         found=True
                 if not found:
                     continue
@@ -240,7 +240,7 @@ class Tile:
             if skip_alpha:
                 alpha = 255
             color = atom.getProperty('color', '#FFFFFF')
-            if alpha != 255 and color != '#FFFFFF':
+            if alpha != 255 or color != '#FFFFFF':
                 c_frame = tint_image(frame, BYOND2RGBA(color, alpha))
             img.paste(c_frame, (32 + pixel_x, 32 - pixel_y), c_frame)  # Add to the top of the stack.
             if pixel_x != 0 or pixel_y != 0:

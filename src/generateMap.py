@@ -31,29 +31,26 @@ THE SOFTWARE.
 """
                 
 def renderMap(args):
-    outfile=args.map+'.{z}.png'
+    outfile = args.map + '.{z}.png'
     if args.area:
         kwargs['area'] = args.area
-        outfile=args.area[0].replace('/','_')+'.png'
-    if len(args.render_types)>0:
-        kwargs['render_types']=args.render_types
+        outfile = args.area[0].replace('/', '_') + '.png'
+    if args.render_types:
+        print(repr(args.render_types))
+        kwargs['render_types'] = args.render_types
     if args.outfile:
-        outfile=args.outfile
+        outfile = args.outfile
     dmm.generateImage(outfile, os.path.dirname(args.project), renderflags, **kwargs)
 
-pipes = [
-'/obj/machinery/atmospherics'
-]
 opt = argparse.ArgumentParser()
 opt.add_argument('project', metavar="project.dme")
 opt.add_argument('map', metavar="map.dmm")
 opt.add_argument('--render-stars', dest='render_stars', default=False, action='store_true', help="Render space.  Normally off to prevent ballooning the image size.")
 opt.add_argument('--render-areas', dest='render_areas', default=False, action='store_true', help="Render area overlays.")
-opt.add_argument('--render-only', dest='render_types', default=[], action='append', help="Render ONLY these types.  Can be used multiple times to specify more types.")
-opt.add_argument('--render-only-pipes', dest='render_types', action='append_const', help="Render ONLY pipes. (SS13)", const=pipes)
+opt.add_argument('--render-only', dest='render_types', action='append', help="Render ONLY these types.  Can be used multiple times to specify more types.")
 opt.add_argument('--area', dest='area', type=list, nargs='*', default=None, help="Specify an area to restrict rendering to.")
-opt.add_argument('--out',dest='outfile',type=str, default=None, help="What to name the file ({z} will be replaced with z-level)")
-opt.add_argument('--area-list',dest='areas',type=str, default=None, help="A file with area_file.png = /area/path on each line")
+opt.add_argument('--out', dest='outfile', type=str, default=None, help="What to name the file ({z} will be replaced with z-level)")
+opt.add_argument('--area-list', dest='areas', type=str, default=None, help="A file with area_file.png = /area/path on each line")
 args = opt.parse_args()
 if os.path.isfile(args.project):
     tree = ObjectTree()
@@ -73,9 +70,9 @@ if os.path.isfile(args.project):
                     continue
                 if '=' not in line:
                     continue
-                outfile,area = line.split('=')
-                args.area=area.strip().split(',')
-                args.outfile=outfile.strip()
+                outfile, area = line.split('=')
+                args.area = area.strip().split(',')
+                args.outfile = outfile.strip()
                 renderMap(args)
     else:
         renderMap(args)
