@@ -56,6 +56,12 @@ class StandardizeManifolds(Matcher):
         'manifold-b-f':'/obj/machinery/atmospherics/pipe/manifold/supply/hidden',
         'manifold-r'  :'/obj/machinery/atmospherics/pipe/manifold/scrubbers/visible',
         'manifold-r-f':'/obj/machinery/atmospherics/pipe/manifold/scrubbers/hidden',
+        'manifold-c'  :'/obj/machinery/atmospherics/pipe/manifold/cyan/visible',
+        'manifold-c-f':'/obj/machinery/atmospherics/pipe/manifold/cyan/hidden',
+        'manifold-y'  :'/obj/machinery/atmospherics/pipe/manifold/yellow/visible',
+        'manifold-y-f':'/obj/machinery/atmospherics/pipe/manifold/yellow/hidden',
+        'manifold-g'  :'/obj/machinery/atmospherics/pipe/manifold/filtering/visible',
+        'manifold-g-f':'/obj/machinery/atmospherics/pipe/manifold/filtering/hidden',
         'manifold'    :'/obj/machinery/atmospherics/pipe/manifold/general/visible',
         'manifold-f'  :'/obj/machinery/atmospherics/pipe/manifold/general/hidden',
     }
@@ -76,6 +82,77 @@ class StandardizeManifolds(Matcher):
     
     def __str__(self):
         return 'Standardized pipe manifold'
+    
+class StandardizePiping(Matcher):
+    TYPE_TRANSLATIONS={
+        '/obj/machinery/atmospherics/pipe/simple': 'simple',
+        '/obj/machinery/atmospherics/pipe/manifold': 'manifold',
+        '/obj/machinery/atmospherics/pipe/manifold4w': 'manifold4w',
+    }
+    COLOR_CODES = {
+        'b':'supply',
+        'r':'scrubbers',
+        'g':'filtering',
+        'c':'cyan',
+        'y':'yellow',
+        '': 'general'
+    }
+    def __init__(self):
+        self.before=None
+        self.after=None
+        return
+        
+    def trans_simple(self,atom):
+        type_tmpl='/obj/machinery/atmospherics/pipe/simple/{color}/{visibility}'
+        color_code,visible = self.parseIconState(atom.getProperty('icon_state',''))
+        return self.getNewType(type_tmpl,color_code,visible)
+        
+    def trans_manifold(self,atom):
+        type_tmpl='/obj/machinery/atmospherics/pipe/manifold/{color}/{visibility}'
+        color_code,visible = self.parseIconState(atom.getProperty('icon_state',''))
+        return self.getNewType(type_tmpl,color_code,visible)
+        
+    def trans_manifold4w(self,atom):
+        type_tmpl='/obj/machinery/atmospherics/pipe/manifold4w/{color}/{visibility}'
+        color_code,visible = self.parseIconState(atom.getProperty('icon_state',''))
+        return self.getNewType(type_tmpl,color_code,visible)
+        
+    def parseIconState(self,state):
+        parts = state.split('-')
+        if len(parts) <= 1:
+            return ('',True)
+        elif len(parts) == 2:
+            if parts[1]=='f':
+                return ('',True)
+            return (parts[1],True) 
+        return (parts[1],parts[2]!='f')
+        
+    def getNewType(self,tmpl,color_code,visible, color_wheel = COLOR_CODES):
+        visibility = 'visible'
+        if not visible:
+            visibility='hidden'
+        color = color_wheel[color_code]
+        return Atom(tmpl.format(color=color,visibility=visibility))
+        
+    def Matches(self, atom):
+        return atom.path in self.TYPE_TRANSLATIONS
+    
+    def Fix(self, atom):
+        self.before = atom.MapSerialize()
+        old_dir=None
+        if 'dir' in atom.mapSpecified:
+            old_dir = int(atom.getProperty('dir',2))
+        atom = getattr(self,'trans_{0}'.format(self.TYPE_TRANSLATIONS[atom.path]))(atom)
+        if old_dir is not None and old_dir != 2:
+            atom.setProperty('dir', old_dir, PropertyFlags.MAP_SPECIFIED)
+        self.after = atom.MapSerialize()
+        return atom
+    
+    def __str__(self):
+        if self.before is not None and self.after is not None:
+            return 'Standardized pipe: {0} -> {1}'.format(self.before,self.after)
+        else:
+            return 'Standardize pipes'
     
 class StandardizeInsulatedPipes(Matcher):
     STATE_TO_TYPE = {
@@ -349,7 +426,7 @@ actions = [
     FixNetwork(),
     
     # Standardize pipes
-    StandardizeManifolds(),
+    StandardizePiping(),
     
     # Standardize insulated pipes
     StandardizeInsulatedPipes(),
@@ -396,7 +473,8 @@ for iid in xrange(len(dmm.instances)):
         if action.Matches(atom):
             atom=action.Fix(atom)
             changes += [str(action)]
-    atom
+    atom.id=iid
+    dmm.setInstance(iid,atom)
     if len(changes) > 0:
         print('{0} (#{1}):'.format(atom.path,atom.id))
         for change in changes:

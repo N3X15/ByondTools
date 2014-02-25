@@ -35,6 +35,19 @@ def trim(im):
     bbox = diff.getbbox()
     if bbox:
         return im.crop(bbox)
+    
+# Bytes
+def tint_image(image, tint_color):
+    return ImageChops.multiply(image, Image.new('RGBA', image.size, tint_color))
+
+def BYOND2RGBA(colorstring, alpha=255):
+    colorstring = colorstring.strip()
+    if colorstring[0] == '#': colorstring = colorstring[1:]
+    if len(colorstring) != 6:
+        raise ValueError, "input #%s is not in #RRGGBB format" % colorstring
+    r, g, b = colorstring[:2], colorstring[2:4], colorstring[4:]
+    r, g, b = [int(n, 16) for n in (r, g, b)]
+    return (r, g, b, alpha)
 
 class Tile:
     FLAG_USE_OLD_ID = 1
@@ -46,7 +59,7 @@ class Tile:
         self.instances = []
         self.frame = None
         self.unselected_frame = None
-        self.selectedArea = True
+        self.areaSelected = True
         self.log = logging.getLogger(__name__ + '.Tile')
         self.map = _map
     
@@ -70,8 +83,10 @@ class Tile:
             atoms += [self.map.getInstance(instance)]
         return atoms
     
+    def SortAtoms(self):
+        return sorted(self.GetAtoms(), reverse=True)
+    
     def GetAtom(self, idx):
-        print(repr(self.instances))
         return self.map.getInstance(self.instances[idx])
     
     def GetInstances(self):
@@ -117,12 +132,22 @@ class Tile:
         else:
             return all(self.instances[i] == other.instances[i] for i in xrange(len(self.instances)))
         
-    def RenderToMapTile(self, passnum, basedir, renderflags):
+    def RenderToMapTile(self, passnum, basedir, renderflags, **kwargs):
         img = Image.new('RGBA', (96, 96))
         self.offset = (32, 32)
         foundAPixelOffset = False
-        for atom in sorted(self.GetAtoms(), reverse=True):
-            
+        render_types = kwargs.get('render_types', ())
+        skip_alpha = kwargs.get('skip_alpha', False)
+        # for atom in sorted(self.GetAtoms(), reverse=True):
+        for atom in self.SortAtoms():
+            if len(render_types) > 0:
+                found=False
+                for path in render_types:
+                    if path.startswith(atom.path):
+                        found=True
+                if not found:
+                    continue
+
             aid = atom.id
             # Ignore /areas.  They look like ass.
             if atom.path.startswith('/area'):
@@ -156,7 +181,7 @@ class Tile:
                     logging.critical('FAILED TO READ dir = ' + repr(atom.properties['dir'].value))
                     continue
             
-            icon_key = '{0}:{1}[{2}]'.format(dmi_file, state, direction)
+            icon_key = '{0}|{1}|{2}'.format(dmi_file, state, direction)
             frame = None
             pixel_x = 0
             pixel_y = 0
@@ -206,9 +231,18 @@ class Tile:
                 pixel_y = 0
                 if 'pixel_y' in atom.properties:
                     pixel_y = int(atom.properties['pixel_y'].value)
-                    
+                
                 _icons[icon_key] = (frame, pixel_x, pixel_y)
-            img.paste(frame, (32 + pixel_x, 32 - pixel_y), frame)  # Add to the top of the stack.
+                    
+            # Handle BYOND alpha and coloring
+            c_frame = frame
+            alpha = int(atom.getProperty('alpha', 255))
+            if skip_alpha:
+                alpha = 255
+            color = atom.getProperty('color', '#FFFFFF')
+            if alpha != 255 and color != '#FFFFFF':
+                c_frame = tint_image(frame, BYOND2RGBA(color, alpha))
+            img.paste(c_frame, (32 + pixel_x, 32 - pixel_y), c_frame)  # Add to the top of the stack.
             if pixel_x != 0 or pixel_y != 0:
                 if passnum == 0: return  # Wait for next pass
                 foundAPixelOffset = True
@@ -282,6 +316,7 @@ class Map:
         self.tree = tree
         self.generatedTexAtlas = False
         self.selectedAreas = ()
+        self.whitelistTypes = None
         
         self.log = logging.getLogger(__name__ + '.Map')
 
@@ -523,9 +558,14 @@ class Map:
                 
     def generateImage(self, filename_tpl, basedir='.', renderflags=0, **kwargs):
         self.selectedAreas = ()
+        skip_alpha = False
+        render_types = ()
         if 'area' in kwargs:
             self.selectedAreas = kwargs['area']
-            print('area = ' + repr(self.selectedAreas))
+        if 'render_types' in kwargs:
+            render_types = kwargs['render_types']
+        if 'skip_alpha' in kwargs:
+            skip_alpha = kwargs['skip_alpha']
         
         # self.generateTexAtlas(basedir, renderflags)
         
@@ -572,7 +612,7 @@ class Map:
                     for x in xrange(self.zLevels[z].width):
                         tile = self.zLevels[z].GetTileAt(x, y)
                         if tile is not None:
-                            frame = tile.RenderToMapTile(render_pass, basedir, renderflags)
+                            frame = tile.RenderToMapTile(render_pass, basedir, renderflags, render_types=render_types, skip_alpha=skip_alpha)
                             # Wait for next pass, or failed to get an image.
                             if frame is None: continue
                             x_o = 0
@@ -811,13 +851,21 @@ class Map:
                         
         return self.AssignIID(currentAtom)
                         
-    def AssignIID(self, atom):
+    def AssignIID(self, atom, replacing=None):
         if atom not in self.instances:
-            atom.id = len(self.instances)
-            self.instances.append(atom)
-            return atom.id
+            if replacing is not None:
+                atom.id = replacing
+                self.instances[replacing] = atom
+                return replacing
+            else:
+                atom.id = len(self.instances)
+                self.instances.append(atom)
+                return atom.id
         else:
-            return self.instances.index(atom)
+            r_iid = self.instances.index(atom)
+            if replacing is not None:
+                self.ReplaceIIDs(replacing, r_iid)
+            return r_iid
             
     def consumeDataValue(self, value, lineNumber):
         data = None
@@ -835,3 +883,19 @@ class Map:
         if iid is None:
             return None
         return self.instances[iid] 
+    
+    def setInstance(self, iid, atom):
+        if iid is None:
+            return None
+        return self.AssignIID(atom, iid)
+        
+    def ReplaceIIDs(self, old_iid, new_iid):
+        updated = 0
+        for tid in xrange(len(self.tileTypes)):
+            for i in xrange(len(self.tileTypes[tid].instances)):
+                if old_iid == self.tileTypes[tid].instances[i]:
+                    self.tileTypes[tid].instances[i] = new_iid
+                    updated += 1
+        if updated > 0:
+            self.log.info('Updated {0} tiles (#{1} -> #{2})'.format(updated, old_iid, new_iid))
+        

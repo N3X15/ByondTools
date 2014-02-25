@@ -1,5 +1,6 @@
 import os, argparse
 from com.byond.objtree import ObjectTree
+from com.byond.basetypes import Atom
 from com.byond.map import Map, MapRenderFlags
 """
 Usage:
@@ -34,15 +35,22 @@ def renderMap(args):
     if args.area:
         kwargs['area'] = args.area
         outfile=args.area[0].replace('/','_')+'.png'
+    if len(args.render_types)>0:
+        kwargs['render_types']=args.render_types
     if args.outfile:
         outfile=args.outfile
     dmm.generateImage(outfile, os.path.dirname(args.project), renderflags, **kwargs)
 
+pipes = [
+'/obj/machinery/atmospherics'
+]
 opt = argparse.ArgumentParser()
 opt.add_argument('project', metavar="project.dme")
 opt.add_argument('map', metavar="map.dmm")
 opt.add_argument('--render-stars', dest='render_stars', default=False, action='store_true', help="Render space.  Normally off to prevent ballooning the image size.")
 opt.add_argument('--render-areas', dest='render_areas', default=False, action='store_true', help="Render area overlays.")
+opt.add_argument('--render-only', dest='render_types', default=[], action='append', help="Render ONLY these types.  Can be used multiple times to specify more types.")
+opt.add_argument('--render-only-pipes', dest='render_types', action='append_const', help="Render ONLY pipes. (SS13)", const=pipes)
 opt.add_argument('--area', dest='area', type=list, nargs='*', default=None, help="Specify an area to restrict rendering to.")
 opt.add_argument('--out',dest='outfile',type=str, default=None, help="What to name the file ({z} will be replaced with z-level)")
 opt.add_argument('--area-list',dest='areas',type=str, default=None, help="A file with area_file.png = /area/path on each line")
@@ -71,7 +79,3 @@ if os.path.isfile(args.project):
                 renderMap(args)
     else:
         renderMap(args)
-    
-    # with open(sys.argv[2]+'.types','w') as f:
-    #    for tile in dmm.tileTypes:
-    #        f.write(tile.MapSerialize(Tile.FLAG_INHERITED_PROPERTIES|Tile.FLAG_USE_OLD_ID)+'\n')

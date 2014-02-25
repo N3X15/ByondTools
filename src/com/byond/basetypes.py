@@ -267,8 +267,11 @@ class Atom:
         myLayer = 0
         otherLayer = 0
         try:
-            myLayer = float(self.properties['layer'].value)
-            otherLayer = float(other.properties['layer'].value)
+            myLayer = float(self.getProperty('layer',myLayer))
+        except ValueError:
+            pass
+        try:
+            otherLayer = float(other.getProperty('layer',otherLayer))
         except ValueError:
             pass
         return myLayer > otherLayer
@@ -279,8 +282,11 @@ class Atom:
         myLayer = 0
         otherLayer = 0
         try:
-            myLayer = float(self.properties['layer'].value)
-            otherLayer = float(other.properties['layer'].value)
+            myLayer = float(self.getProperty('layer',myLayer))
+        except ValueError:
+            pass
+        try:
+            otherLayer = float(other.getProperty('layer',otherLayer))
         except ValueError:
             pass
         return myLayer < otherLayer
