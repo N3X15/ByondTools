@@ -308,6 +308,21 @@ class ObjectTree:
                         self.loadingProc.AddBlankLine()
                     continue
                 
+                # Preprocessing
+                for key, define in self.defines.items():
+                    if key in line:
+                        if key not in self.defineMatchers:
+                            self.defineMatchers[key] = re.compile(r'\b' + key + r'\b')
+                        newline = self.defineMatchers[key].sub(str(define.value), line)
+                        if newline != line:
+                            '''
+                            if filename.endswith('pipes.dm'):
+                                print('OLD: {}'.format(line))
+                                print('PPD: {}'.format(newline))
+                            '''
+                            line = newline
+                
+                # Preprocessing defines.
                 if line.startswith("#"):
                     if line.endswith('\\'): continue
                     if line.startswith('#define'):
@@ -334,15 +349,6 @@ class ObjectTree:
                         self.fileLayout += [('PP_TOKEN', line)]
                         print('BUG: Unhandled preprocessor directive {} in {}:{}'.format(chunks[0], filename, ln))
                     continue
-                else:
-                    for key, define in self.defines.items():
-                        if key in line:
-                            if key not in self.defineMatchers:
-                                self.defineMatchers[key] = re.compile(r'\b' + key + r'\b')
-                            newline = self.defineMatchers[key].sub(str(define.value), line)
-                            # print('OLD: {}'.format(line))
-                            # print('PPD: {}'.format(newline))
-                            line = newline
                 
                 m = REGEX_TABS.match(self.lineBeforePreprocessing)
                 if m is not None:
