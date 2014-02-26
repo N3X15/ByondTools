@@ -86,20 +86,20 @@ class ObjectTree:
                 self.ProcessFile(os.path.join(stdlib_dir, filename))
         changed_files = 0
         rootdir = os.path.dirname(dmefile)
-        projectfile = os.path.join(rootdir,os.path.basename(dmefile).replace('.dme','.otr'))
+        projectfile = os.path.join(rootdir, os.path.basename(dmefile).replace('.dme', '.otr'))
         project = {
             'files':{},
             'atoms':{},
             'tree':{}
         }
-        old_project={
+        old_project = {
             'files':{},
             'atoms':{},
             'tree':{}
         }
         if os.path.isfile(projectfile):
             print('--- Loading pickled object tree...')
-            with open(projectfile,'r') as f:
+            with open(projectfile, 'r') as f:
                 old_project = pickle.load(f)
         with open(dmefile, 'r') as dmeh:
             for line in dmeh:
@@ -122,7 +122,7 @@ class ObjectTree:
                             if not inString:
                                 filepath = os.path.join(rootdir, filename)
                                 if filepath.endswith(ext):
-                                    project['files'][filepath]=md5sum(filepath)
+                                    project['files'][filepath] = md5sum(filepath)
                                     if filepath not in old_project['files'] or project['files'][filepath] != old_project['files'][filepath]:
                                         changed_files += 1
                                 filename = ''
@@ -134,17 +134,16 @@ class ObjectTree:
             print('--- {0} changed files. Parsing DM files...'.format(changed_files))
             for f in project['files']:
                 self.ProcessFile(f)
+            print('--- Saving atoms...')
+            project['atoms'] = self.Atoms
             self.MakeTree()
-            print('--- Saving tree...')
-            project['atoms']=self.Atoms
-            project['tree']=self.Atoms
-            with open(projectfile,'w') as f:
+            with open(projectfile, 'w') as f:
                 pickle.dump(project, f)
         else:
-            print('--- No changes detected, using pickled tree...')
-            self.Atoms=old_project['atoms']
-            self.Tree=old_project['tree']
-                    
+            print('--- No changes detected, using pickled atoms...')
+            self.Atoms = old_project['atoms']
+            self.MakeTree()
+            
     def ProcessAtom(self, filename, ln, line, atom, atom_path, numtabs, procArgs=None):
         # Reserved words that show up on their own
         if atom in ObjectTree.reserved_words:
@@ -214,7 +213,7 @@ class ObjectTree:
         if npath not in self.Atoms:
             if procArgs is not None:
                 assert npath.endswith(')')
-                #if origpath != npath:
+                # if origpath != npath:
                 #    print(origpath,proc_def)
                 proc = Proc(npath, procArgs, filename, ln)
                 proc.origpath = origpath
