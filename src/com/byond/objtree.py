@@ -2,7 +2,14 @@
 Superficially generate an object/property tree.
 '''
 import re, logging, os
+
+try:
+    import cPickle as pickle
+except:
+    import pickle
+   
 from .basetypes import *
+from .utils import md5sum
 
 REGEX_TABS = re.compile('^(?P<tabs>[\t\s]*)')  # \s*$
 # REGEX_VARIABLE_STRING   = re.compile('^(?P<tabs>\t+)(?:var/)?(?P<type>[a-zA-Z0-9_]*/)?(?P<variable>[a-zA-Z0-9_]+)\s*=\s*(?P<qmark>[\'"])(?P<content>.+)(?P=qmark)\s*$')
@@ -77,10 +84,21 @@ class ObjectTree:
             stdlib_dir = os.path.join(stdlib_dir, 'stdlib')
             for filename in self.stdlib_files:
                 self.ProcessFile(os.path.join(stdlib_dir, filename))
-                
-        print('--- Parsing DM files...')
-        numFilesTotal = 0
+        changed_files = 0
         rootdir = os.path.dirname(dmefile)
+        projectfile = os.path.join(rootdir,os.path.basename(dmefile).replace('.dme','.otr'))
+        project = {
+            'files':{},
+            'atoms':{}
+        }
+        old_project={
+            'files':{},
+            'atoms':{}
+        }
+        if os.path.isfile(projectfile):
+            print('--- Loading pickled object tree...')
+            with open(projectfile,'r') as f:
+                old_project = pickle.load(f)
         with open(dmefile, 'r') as dmeh:
             for line in dmeh:
                 if line.startswith('#include'):
@@ -102,15 +120,27 @@ class ObjectTree:
                             if not inString:
                                 filepath = os.path.join(rootdir, filename)
                                 if filepath.endswith(ext):
-                                    # print('Processing {0}...'.format(filepath))
-                                    self.ProcessFile(filepath)
-                                    numFilesTotal += 1
+                                    project['files'][filepath]=md5sum(filepath)
+                                    if filepath not in old_project['files'] or project['files'][filepath] != old_project['files'][filepath]:
+                                        changed_files += 1
                                 filename = ''
                             continue
                         else:
                             if inString:
                                 filename += c
-        self.MakeTree()
+        if changed_files > 0:
+            print('--- {0} changed files. Parsing DM files...'.format(changed_files))
+            for f in project['files']:
+                self.ProcessFile(f)
+            self.MakeTree()
+            print('--- Saving tree...')
+            project['atoms']=self.Atoms
+            with open(projectfile,'w') as f:
+                pickle.dump(project, f)
+        else:
+            print('--- No changes detected, using pickled tree...')
+            self.Atoms=old_project['atoms']
+            self.MakeTree()
                     
     def ProcessAtom(self, filename, ln, line, atom, atom_path, numtabs, procArgs=None):
         # Reserved words that show up on their own
