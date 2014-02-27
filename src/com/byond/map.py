@@ -788,7 +788,7 @@ class Map:
         # BYOND uses LOWER left.
         # PIL uses UPPER left
         X += 0
-        Y += 32 + icon_height
+        Y += 32 - icon_height
 
         return (
             X,

@@ -22,6 +22,9 @@ REGEX_LINE_COMMENT = re.compile('//.*?$')
 
 def debug(filename, line, path, message):
     print('{0}:{1}: {2} - {3}'.format(filename, line, '/'.join(path), message))
+    
+#: Only used for obliterating serialized object trees. (.otr files)
+OTR_VERSION = 26022014
 
 class ObjectTree:
     reserved_words = ('else', 'break', 'return', 'continue', 'spawn')  # , 'proc')
@@ -80,29 +83,34 @@ class ObjectTree:
         return o
         
     def ProcessFilesFromDME(self, dmefile='baystation12.dme', ext='.dm', **kwargs):
-        if not self.LoadedStdLib and kwargs.get('load_stdlib', True):
-            stdlib_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
-            stdlib_dir = os.path.join(stdlib_dir, 'stdlib')
-            for filename in self.stdlib_files:
-                self.ProcessFile(os.path.join(stdlib_dir, filename))
         changed_files = 0
         rootdir = os.path.dirname(dmefile)
         projectfile = os.path.join(rootdir, os.path.basename(dmefile).replace('.dme', '.otr'))
         project = {
+            'version': OTR_VERSION,
             'files':{},
             'atoms':{},
             'tree':{}
         }
         old_project = {
+            'version': OTR_VERSION,
             'files':{},
             'atoms':{},
             'tree':{}
         }
-        if self.skip_otr:
+        if not self.skip_otr:
             if os.path.isfile(projectfile):
                 print('--- Loading pickled object tree...')
+                otr_data = None
                 with open(projectfile, 'r') as f:
-                    old_project = pickle.load(f)
+                    otr_data = pickle.load(f)
+                if otr_data.get('version',None) == OTR_VERSION:
+                    old_project=otr_data
+        if not self.LoadedStdLib and kwargs.get('load_stdlib', True):
+            stdlib_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+            stdlib_dir = os.path.join(stdlib_dir, 'stdlib')
+            for filename in self.stdlib_files:
+                self.ProcessFile(os.path.join(stdlib_dir, filename))
         with open(dmefile, 'r') as dmeh:
             for line in dmeh:
                 if line.startswith('#include'):
@@ -132,7 +140,7 @@ class ObjectTree:
                         else:
                             if inString:
                                 filename += c
-        if changed_files > 0 or 'tree' not in old_project or self.skip_otr:
+        if self.skip_otr or changed_files > 0 or 'tree' not in old_project:
             print('--- {0} changed files. Parsing DM files...'.format(changed_files))
             for f in project['files']:
                 self.ProcessFile(f)
