@@ -94,9 +94,10 @@ if os.path.isfile(sys.argv[1]):
                 body += '<tr><th>{0}</th><td>{1}</td></tr>'.format(attr_name, atom.getProperty(attr_name, None))
             body += '</tbody></table>'
             
-            body += '<h2>All Properties:</h2><table class="prettytable"><thead><tr><th>Name</th><th>Value</th></tr></thead><tbody>'
+            body += '<h2>All Properties:</h2><table class="prettytable"><thead><tr><th>Name</th><th>Value</th><th>File/Line</th></tr></thead><tbody>'
             for attr_name in sorted(atom.properties.keys()):
-                body += '<tr><th>{0}</th><td>{1}</td></tr>'.format(attr_name, atom.getProperty(attr_name, None))
+                attr = atom.properties[attr_name]
+                body += '<tr><th>{0}</th><td>{1}</td><td>{2}:{3}</td></tr>'.format(attr_name, attr.value, attr.filename, attr.line)
             body += '</tbody></table>'
             f.write(MakePage(title='Instance #{0}'.format(atom.id), depth=1, body=body))
     with open(os.path.join(basedir, 'instances', 'index.html'), 'w') as idx:

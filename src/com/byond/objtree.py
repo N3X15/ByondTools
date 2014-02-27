@@ -50,6 +50,7 @@ class ObjectTree:
         self.comments = []
         self.fileLayouts = {}
         self.LeavePreprocessorDirectives = options.get('preprocessor_directives', False)
+        self.skip_otr=False
         
         nit = self.ignoreTokens.copy()
         for _, stop in self.ignoreTokens.iteritems():
@@ -97,10 +98,11 @@ class ObjectTree:
             'atoms':{},
             'tree':{}
         }
-        if os.path.isfile(projectfile):
-            print('--- Loading pickled object tree...')
-            with open(projectfile, 'r') as f:
-                old_project = pickle.load(f)
+        if self.skip_otr:
+            if os.path.isfile(projectfile):
+                print('--- Loading pickled object tree...')
+                with open(projectfile, 'r') as f:
+                    old_project = pickle.load(f)
         with open(dmefile, 'r') as dmeh:
             for line in dmeh:
                 if line.startswith('#include'):
@@ -130,7 +132,7 @@ class ObjectTree:
                         else:
                             if inString:
                                 filename += c
-        if changed_files > 0 or 'tree' not in old_project:
+        if changed_files > 0 or 'tree' not in old_project or self.skip_otr:
             print('--- {0} changed files. Parsing DM files...'.format(changed_files))
             for f in project['files']:
                 self.ProcessFile(f)
@@ -340,20 +342,6 @@ class ObjectTree:
                         self.loadingProc.AddBlankLine()
                     continue
                 
-                # Preprocessing
-                for key, define in self.defines.items():
-                    if key in line:
-                        if key not in self.defineMatchers:
-                            self.defineMatchers[key] = re.compile(r'\b' + key + r'\b')
-                        newline = self.defineMatchers[key].sub(str(define.value), line)
-                        if newline != line:
-                            '''
-                            if filename.endswith('pipes.dm'):
-                                print('OLD: {}'.format(line))
-                                print('PPD: {}'.format(newline))
-                            '''
-                            line = newline
-                
                 # Preprocessing defines.
                 if line.startswith("#"):
                     if line.endswith('\\'): continue
@@ -362,6 +350,8 @@ class ObjectTree:
                         defineChunks = line.split(None, 3)
                         if len(defineChunks) == 2:
                             defineChunks += [1]
+                        elif len(defineChunks) == 3:
+                            defineChunks[2]=self.PreprocessLine(defineChunks[2])
                         # print(repr(defineChunks))
                         try:
                             if '.' in defineChunks[2]:
@@ -381,6 +371,9 @@ class ObjectTree:
                         self.fileLayout += [('PP_TOKEN', line)]
                         print('BUG: Unhandled preprocessor directive {} in {}:{}'.format(chunks[0], filename, ln))
                     continue
+                
+                # Preprocessing
+                line=self.PreprocessLine(line)
                 
                 m = REGEX_TABS.match(self.lineBeforePreprocessing)
                 if m is not None:
@@ -565,3 +558,18 @@ class ObjectTree:
         self.Atoms[path] = cNode
         return cNode
         
+
+    def PreprocessLine(self,line):
+        for key, define in self.defines.items():
+            if key in line:
+                if key not in self.defineMatchers:
+                    self.defineMatchers[key] = re.compile(r'\b' + key + r'\b')
+                newline = self.defineMatchers[key].sub(str(define.value), line)
+                if newline != line:
+                    '''
+                    if filename.endswith('pipes.dm'):
+                        print('OLD: {}'.format(line))
+                        print('PPD: {}'.format(newline))
+                    '''
+                    line = newline
+        return line

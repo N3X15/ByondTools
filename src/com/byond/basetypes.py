@@ -11,6 +11,7 @@ MOB_LAYER = 4
 FLY_LAYER = 5
 
 import re
+from utils import eval_expr
 REGEX_TABS = re.compile('^(?P<tabs>\t*)') 
 class BYONDValue:
     """
@@ -259,7 +260,12 @@ class Atom:
             return False
         if self.path != atom.path:
             return False
-        return self.properties == atom.properties  
+        return self.properties == atom.properties
+    
+    def handle_math(self,expr):
+        if isinstance(expr,str):
+            return eval_expr(expr)
+        return expr
         
     def __lt__(self, other):
         if 'layer' not in self.properties or 'layer' not in other.properties:
@@ -267,12 +273,14 @@ class Atom:
         myLayer = 0
         otherLayer = 0
         try:
-            myLayer = float(self.getProperty('layer',myLayer))
+            myLayer = self.handle_math(self.getProperty('layer',myLayer))
         except ValueError:
+            print('Failed to parse {0} as float.'.format(self.properties['layer'].value))
             pass
         try:
-            otherLayer = float(other.getProperty('layer',otherLayer))
+            otherLayer = self.handle_math(other.getProperty('layer',otherLayer))
         except ValueError:
+            print('Failed to parse {0} as float.'.format(other.properties['layer'].value))
             pass
         return myLayer > otherLayer
         
@@ -282,12 +290,14 @@ class Atom:
         myLayer = 0
         otherLayer = 0
         try:
-            myLayer = float(self.getProperty('layer',myLayer))
+            myLayer = self.handle_math(self.getProperty('layer',myLayer))
         except ValueError:
+            print('Failed to parse {0} as float.'.format(self.properties['layer'].value))
             pass
         try:
-            otherLayer = float(other.getProperty('layer',otherLayer))
+            otherLayer = self.handle_math(other.getProperty('layer',otherLayer))
         except ValueError:
+            print('Failed to parse {0} as float.'.format(other.properties['layer'].value))
             pass
         return myLayer < otherLayer
     
