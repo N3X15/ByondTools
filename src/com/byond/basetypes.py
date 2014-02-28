@@ -11,7 +11,7 @@ MOB_LAYER = 4
 FLY_LAYER = 5
 
 import re
-from utils import eval_expr
+from .utils import eval_expr
 REGEX_TABS = re.compile('^(?P<tabs>\t*)') 
 class BYONDValue:
     """
