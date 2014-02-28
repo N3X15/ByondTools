@@ -115,7 +115,7 @@ def disassemble(path, to, parser):
 		except Exception as e:
 			print("Received error, continuing: %s" % traceback.format_exc())
 
-def compare(theirsfile, minefile, parser, reportstream):
+def compare(theirsfile, minefile, parser, reportstream, **kwargs):
 	# print('\tD %s -> %s' % (theirsfile, minefile))
 	theirs = []
 	theirsDMI = None
@@ -124,9 +124,20 @@ def compare(theirsfile, minefile, parser, reportstream):
 	states = []
 	
 	new2mineFilename = minefile.replace('.dmi', '.new.dmi')
+	new2theirsFilename = theirsfile.replace('.dmi', '.new.dmi')
+	
+	new2mine=None
 	if os.path.isfile(new2mineFilename):
 		os.remove(new2mineFilename)
-	new2mine = DMI(new2mineFilename)
+	if kwargs.get('newfile_mine',True):
+		new2mine = DMI(new2mineFilename)
+	
+	new2theirs=None
+	if os.path.isfile(new2theirsFilename):
+		os.remove(new2theirsFilename)
+	if kwargs.get('newfile_theirs',False):
+		new2theirs = DMI(new2theirsFilename)
+	
 	
 	o = ''
 	if(os.path.isfile(theirsfile)):
@@ -166,9 +177,12 @@ def compare(theirsfile, minefile, parser, reportstream):
 		inMine = state in mine 
 		if inTheirs and not inMine:
 			o += '\n + {1}'.format(minefile, state)
-			new2mine.states[state] = theirsDMI.states[state]
+			if new2mine is not None:
+				new2mine.states[state] = theirsDMI.states[state]
 		elif not inTheirs and inMine:
 			o += '\n - {1}'.format(theirsfile, state)
+			if new2theirs is not None:
+				new2theirs.states[state] = mineDMI.states[state]
 		elif inTheirs and inMine:
 			if theirs[state].ToString() != mine[state].ToString():
 				o += '\n - {0}: {1}'.format(state, mine[state].ToString())
@@ -177,12 +191,21 @@ def compare(theirsfile, minefile, parser, reportstream):
 		reportstream.write('\n--- {0}'.format(theirsfile))
 		reportstream.write('\n+++ {0}'.format(minefile))
 		reportstream.write(o)
-		if len(new2mine.states) > 0:
-			new2mine.save(new2mineFilename)
-		else:
-			if os.path.isfile(new2mineFilename):
-				os.remove(new2mineFilename)
-				#print('RM {0}'.format(new2mineFilename))
+		
+		if new2mine is not None:
+			if len(new2mine.states) > 0:
+				new2mine.save(new2mineFilename)
+			else:
+				if os.path.isfile(new2mineFilename):
+					os.remove(new2mineFilename)
+					#print('RM {0}'.format(new2mineFilename))
+		if new2theirs is not None:
+			if len(new2theirs.states) > 0:
+				new2theirs.save(new2theirsFilename)
+			else:
+				if os.path.isfile(new2theirsFilename):
+					os.remove(new2theirsFilename)
+					#print('RM {0}'.format(new2theirsFilename))
 
 def disassemble_all(in_dir, out_dir, parser):
 	print('D_A %s -> %s' % (in_dir, out_dir))
@@ -198,7 +221,7 @@ def disassemble_all(in_dir, out_dir, parser):
 			disassemble(path, to, parser)
 	
 
-def compare_all(in_dir, out_dir, report, parser):
+def compare_all(in_dir, out_dir, report, parser, **kwargs):
 	with open(report, 'w') as report:
 		report.write('# DMITool Difference Report: {0} {1}'.format(os.path.abspath(in_dir), os.path.abspath(out_dir)))
 		for root, dirnames, filenames in os.walk(in_dir):
@@ -208,7 +231,7 @@ def compare_all(in_dir, out_dir, report, parser):
 				to = os.path.join(to, filename)
 				path = os.path.abspath(path)
 				to = os.path.abspath(to)
-				compare(path, to, parser, report)
+				compare(path, to, parser, report, **kwargs)
 
 
 if __name__ == '__main__':
