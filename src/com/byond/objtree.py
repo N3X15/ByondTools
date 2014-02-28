@@ -23,8 +23,70 @@ REGEX_LINE_COMMENT = re.compile('//.*?$')
 def debug(filename, line, path, message):
     print('{0}:{1}: {2} - {3}'.format(filename, line, '/'.join(path), message))
     
-#: Only used for obliterating serialized object trees. (.otr files)
-OTR_VERSION = 26022014
+class OTRCache:
+    # : Only used for obliterating outdated data.
+    VERSION = 27022014
+    
+    def __init__(self, filename):
+        self.filename = filename
+        self.files = {}
+        self.atoms = None
+        self.handle = None
+
+    def StartReading(self):
+        if self.handle:
+            self.handle.close()
+        self.handle = None
+        if os.path.isfile(self.filename):
+            self.handle = open(self.filename, 'r')
+
+    def StopReading(self):
+        self.handle.close()
+        
+    def CheckVersion(self):
+        # print('READ VERSION')
+        # Block 1: Version
+        if pickle.load(self.handle) != self.VERSION:
+            print('!!! Outdated OTR data, rebuilding.')
+            return False
+        return True
+    
+    def ReadFiles(self):
+        # print('READ FILES')
+        # Block 2: Files
+        self.files = pickle.load(self.handle)
+    
+    def ReadAtoms(self):
+        # print('READ ATOMS')
+        return pickle.load(self.handle)
+        
+    def CheckFileHash(self, fn, md5):
+        # print('{0}: {1}'.format(fn,md5))
+        if fn not in self.files:
+            print(' + {0}'.format(fn))
+            return False
+        if self.files[fn] != md5:
+            print(' * {0}'.format(fn))
+            return False
+        return True
+    
+    def PruneFiles(self,file_list):
+        for fn in self.files.keys():
+            if fn not in file_list:
+                self.files -= [fn]
+                print(' - {0}'.format(fn))
+        
+    def SetFileMD5(self, fn, md5):
+        self.files[fn] = md5
+        
+    def GetFiles(self):
+        return self.files.keys()
+        
+    def Save(self, atoms):
+        with open(self.filename, 'w') as f:
+            pickle.dump(self.VERSION, f)
+            pickle.dump(self.files, f)
+            pickle.dump(atoms, f)
 
 class ObjectTree:
     reserved_words = ('else', 'break', 'return', 'continue', 'spawn')  # , 'proc')
@@ -53,7 +115,7 @@ class ObjectTree:
         self.comments = []
         self.fileLayouts = {}
         self.LeavePreprocessorDirectives = options.get('preprocessor_directives', False)
-        self.skip_otr=False
+        self.skip_otr = False
         
         nit = self.ignoreTokens.copy()
         for _, stop in self.ignoreTokens.iteritems():
@@ -86,31 +148,22 @@ class ObjectTree:
         changed_files = 0
         rootdir = os.path.dirname(dmefile)
         projectfile = os.path.join(rootdir, os.path.basename(dmefile).replace('.dme', '.otr'))
-        project = {
-            'version': OTR_VERSION,
-            'files':{},
-            'atoms':{},
-            'tree':{}
-        }
-        old_project = {
-            'version': OTR_VERSION,
-            'files':{},
-            'atoms':{},
-            'tree':{}
-        }
+        
+        cache = OTRCache(projectfile)
         if not self.skip_otr:
             if os.path.isfile(projectfile):
                 print('--- Loading pickled object tree...')
-                otr_data = None
-                with open(projectfile, 'r') as f:
-                    otr_data = pickle.load(f)
-                if otr_data.get('version',None) == OTR_VERSION:
-                    old_project=otr_data
+                cache.StartReading()
+                if cache.CheckVersion():
+                    cache.ReadFiles()
+                
+        ToRead = []
         if not self.LoadedStdLib and kwargs.get('load_stdlib', True):
             stdlib_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
             stdlib_dir = os.path.join(stdlib_dir, 'stdlib')
             for filename in self.stdlib_files:
-                self.ProcessFile(os.path.join(stdlib_dir, filename))
+                # self.ProcessFile(os.path.join(stdlib_dir, filename))
+                ToRead += [os.path.join(stdlib_dir, filename)]
         with open(dmefile, 'r') as dmeh:
             for line in dmeh:
                 if line.startswith('#include'):
@@ -132,26 +185,30 @@ class ObjectTree:
                             if not inString:
                                 filepath = os.path.join(rootdir, filename)
                                 if filepath.endswith(ext):
-                                    project['files'][filepath] = md5sum(filepath)
-                                    if filepath not in old_project['files'] or project['files'][filepath] != old_project['files'][filepath]:
-                                        changed_files += 1
+                                    ToRead += [filepath]
                                 filename = ''
                             continue
                         else:
                             if inString:
                                 filename += c
-        if self.skip_otr or changed_files > 0 or 'tree' not in old_project:
+        
+        for filepath in ToRead:
+            md5 = md5sum(filepath)
+            if not cache.CheckFileHash(filepath, md5):
+                changed_files += 1
+                cache.SetFileMD5(filepath, md5)
+        if self.skip_otr or changed_files > 0:
             print('--- {0} changed files. Parsing DM files...'.format(changed_files))
-            for f in project['files']:
+            for f in ToRead:
                 self.ProcessFile(f)
             print('--- Saving atoms...')
-            project['atoms'] = self.Atoms
+            cache.StopReading()
+            cache.Save(self.Atoms)
             self.MakeTree()
-            with open(projectfile, 'w') as f:
-                pickle.dump(project, f)
         else:
             print('--- No changes detected, using pickled atoms...')
-            self.Atoms = old_project['atoms']
+            self.Atoms = cache.ReadAtoms()
+            cache.StopReading()
             self.MakeTree()
             
     def ProcessAtom(self, filename, ln, line, atom, atom_path, numtabs, procArgs=None):
@@ -359,7 +416,7 @@ class ObjectTree:
                         if len(defineChunks) == 2:
                             defineChunks += [1]
                         elif len(defineChunks) == 3:
-                            defineChunks[2]=self.PreprocessLine(defineChunks[2])
+                            defineChunks[2] = self.PreprocessLine(defineChunks[2])
                         # print(repr(defineChunks))
                         try:
                             if '.' in defineChunks[2]:
@@ -381,7 +438,7 @@ class ObjectTree:
                     continue
                 
                 # Preprocessing
-                line=self.PreprocessLine(line)
+                line = self.PreprocessLine(line)
                 
                 m = REGEX_TABS.match(self.lineBeforePreprocessing)
                 if m is not None:
@@ -567,7 +624,7 @@ class ObjectTree:
         return cNode
         
 
-    def PreprocessLine(self,line):
+    def PreprocessLine(self, line):
         for key, define in self.defines.items():
             if key in line:
                 if key not in self.defineMatchers:
