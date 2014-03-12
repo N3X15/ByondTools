@@ -25,7 +25,7 @@ def debug(filename, line, path, message):
     
 class OTRCache:
     # : Only used for obliterating outdated data.
-    VERSION = [11, 3, 2013]
+    VERSION = [11, 3, 2014]
     
     def __init__(self, filename):
         self.filename = filename
