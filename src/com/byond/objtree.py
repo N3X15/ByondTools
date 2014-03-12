@@ -1,7 +1,7 @@
 '''
 Superficially generate an object/property tree.
 '''
-import re, logging, os
+import re, logging, os, sys
 
 try:
     import cPickle as pickle
@@ -25,7 +25,7 @@ def debug(filename, line, path, message):
     
 class OTRCache:
     # : Only used for obliterating outdated data.
-    VERSION = 27022014
+    VERSION = [11, 3, 2013]
     
     def __init__(self, filename):
         self.filename = filename
@@ -41,7 +41,8 @@ class OTRCache:
             self.handle = open(self.filename, 'r')
 
     def StopReading(self):
-        self.handle.close()
+        if self.handle is not None:
+            self.handle.close()
         
     def CheckVersion(self):
         # print('READ VERSION')
@@ -70,7 +71,7 @@ class OTRCache:
             return False
         return True
     
-    def PruneFiles(self,file_list):
+    def PruneFiles(self, file_list):
         for fn in self.files.keys():
             if fn not in file_list:
                 self.files -= [fn]
@@ -121,6 +122,8 @@ class ObjectTree:
         for _, stop in self.ignoreTokens.iteritems():
             nit[stop] = None
         self.ignoreTokens = nit
+        
+        self.defines['__OBJTREE']=BYONDValue('1')
     
     def ProcessMultiString(self, filename, line, ignoreLevels, current_buffer):
         return '"{0}"'.format(current_buffer)
@@ -150,12 +153,17 @@ class ObjectTree:
         projectfile = os.path.join(rootdir, os.path.basename(dmefile).replace('.dme', '.otr'))
         
         cache = OTRCache(projectfile)
+        invalid = False
         if not self.skip_otr:
             if os.path.isfile(projectfile):
                 print('--- Loading pickled object tree...')
                 cache.StartReading()
                 if cache.CheckVersion():
                     cache.ReadFiles()
+                else:
+                    invalid = True
+            else:
+                invalid = True
                 
         ToRead = []
         if not self.LoadedStdLib and kwargs.get('load_stdlib', True):
@@ -194,11 +202,14 @@ class ObjectTree:
         
         for filepath in ToRead:
             md5 = md5sum(filepath)
-            if not cache.CheckFileHash(filepath, md5):
+            if invalid or not cache.CheckFileHash(filepath, md5):
                 changed_files += 1
                 cache.SetFileMD5(filepath, md5)
-        if self.skip_otr or changed_files > 0:
-            print('--- {0} changed files. Parsing DM files...'.format(changed_files))
+        if invalid or self.skip_otr or changed_files > 0:
+            if invalid:
+                print('--- Rebuilding object tree - Parsing DM files...'.format(changed_files))
+            else:
+                print('--- {0} changed files. Parsing DM files...'.format(changed_files))
             for f in ToRead:
                 self.ProcessFile(f)
             print('--- Saving atoms...')
@@ -210,6 +221,36 @@ class ObjectTree:
             self.Atoms = cache.ReadAtoms()
             cache.StopReading()
             self.MakeTree()
+            
+    def DetermineContext(self, filename, ln, line, numtabs, atom_prefix=[]):
+        '''
+        Spit out the full path of the atom we're currently in.
+        
+        Does NOT update internal positioning.  Think peek.
+        '''
+        if numtabs == 0:
+            return None  # Global context
+            
+        elif numtabs > self.pindent:
+            return '/'.join(self.cpath + atom_prefix)
+            
+        elif numtabs < self.pindent:
+            cpath_copy = list(self.cpath)
+            for _ in range(self.pindent - numtabs + 1):
+                popsToDo = self.popLevels.pop()
+                for _ in range(popsToDo):
+                    cpath_copy.pop()
+            cpath_copy += atom_prefix
+            return '/'.join(cpath_copy)
+            
+        elif numtabs == self.pindent:
+            cpath_copy = list(self.cpath)
+            levelsToPop = self.popLevels.pop()
+            for _ in range(levelsToPop):
+                cpath_copy.pop()
+            cpath_copy += atom_prefix
+            return '/'.join(cpath_copy)
+        
             
     def ProcessAtom(self, filename, ln, line, atom, atom_path, numtabs, procArgs=None):
         # Reserved words that show up on their own
@@ -312,6 +353,18 @@ class ObjectTree:
             self.AddCodeToProc(self.ignoreStartIndent, self.comment)
         self.comment = ''
         
+    def ob_force_parent(self,context,newparent):
+        '''
+        Used internally to force the parent of an object.
+        '''
+        context.ob_forced_parent = newparent
+        
+    def handleOBToken(self,name,context,params):
+        if context is not None:
+            context = self.Atoms[context]
+        name = 'ob_{0}'.format(name.lower())
+        getattr(self,name)(context,*params)
+        
     def ProcessFile(self, filename):
         self.cpath = []
         self.popLevels = []
@@ -408,9 +461,12 @@ class ObjectTree:
                     continue
                 
                 # Preprocessing defines.
-                if line.startswith("#"):
+                if line.strip().startswith("#"):
                     if line.endswith('\\'): continue
-                    if line.startswith('#define'):
+                    tokenChunks=line.split('#')
+                    tokenChunks=tokenChunks[1].split()
+                    directive=tokenChunks[0]
+                    if directive == 'define':
                         # #define SOMETHING Value
                         defineChunks = line.split(None, 3)
                         if len(defineChunks) == 2:
@@ -426,15 +482,28 @@ class ObjectTree:
                         except:
                             self.defines[defineChunks[1]] = BYONDString(defineChunks[2], filename, ln)
                         self.fileLayout += [('DEFINE', defineChunks[1], defineChunks[2])]
-                    elif line.startswith('#undef'):
+                    elif directive == 'undef':
                         undefChunks = line.split(' ', 2)
                         if undefChunks[1] in self.defines:
                             del self.defines[undefChunks[1]]
                         self.fileLayout += [('UNDEF', undefChunks[1])]
+                    
+                    # OpenBYOND tokens.
+                    elif directive.startswith('__OB_'):
+                        numtabs = 0
+                        m = REGEX_TABS.match(line)
+                        if m is not None:
+                            numtabs = len(m.group('tabs'))
+                        atom = self.DetermineContext(filename, ln, line, numtabs)
+                        #if atom is None: continue
+                        #print('OBTOK {0}'.format(repr(tokenChunks)))
+                        self.handleOBToken(tokenChunks[0].replace('__OB_',''),atom,tokenChunks[1:])
+                        # self.fileLayout += [('OBTOK', atom.path)]
+                        continue
                     else:
                         chunks = line.split(' ')
                         self.fileLayout += [('PP_TOKEN', line)]
-                        print('BUG: Unhandled preprocessor directive {} in {}:{}'.format(chunks[0], filename, ln))
+                        print('BUG: Unhandled preprocessor directive #{} in {}:{}'.format(directive, filename, ln))
                     continue
                 
                 # Preprocessing
@@ -599,6 +668,9 @@ class ObjectTree:
                             else:
                                 cNode.children[path_item] = Atom('/'.join([''] + cpath))
                         cNode.children[path_item].parent = cNode
+                        if cNode.children[path_item].ob_forced_parent:
+                            print(' - Parent of {0} forced to be {1}'.format(cNode.children[path_item].path,cNode.children[path_item].ob_forced_parent))
+                            cNode.children[path_item].parent=self.Atoms[cNode.children[path_item].ob_forced_parent]
                     cNode = cNode.children[path_item]
         self.Tree.InheritProperties()
         print('Processed {0} atoms.'.format(len(self.Atoms)))

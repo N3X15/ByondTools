@@ -164,16 +164,24 @@ class Atom:
         #: Instance ID that was read from the map.
         self.old_id = None
         
+        #: Used internally.
+        self.ob_forced_parent=None
+        
+        #: Used internally.
+        self.ob_inherited=False
+        
     def copy(self):
         '''
         Make a copy of this atom, without dangling references.
         
-        :returns com.byond.map.Map
+        :returns com.byond.basetypes.Atom
         '''
         new_node = Atom(self.path)
         new_node.properties = self.properties.copy()
         new_node.mapSpecified = self.mapSpecified
         new_node.id = self.id
+        new_node.old_id = self.old_id
+        new_node.ob_forced_parent = self.ob_forced_parent
         # new_node.parent = self.parent
         return new_node
     
@@ -234,19 +242,25 @@ class Atom:
                 value = str(value)
             self.properties[index] = BYONDString(value)
         elif flags & PropertyFlags.FILEREF:
-            if flags & PropertyFlags.RILEREF:
+            if flags & PropertyFlags.FILEREF:
                 value = str(value)
             self.properties[index] = BYONDFileRef(value)
         else:
             self.properties[index] = BYONDValue(value)
 
     def InheritProperties(self):
+        if self.ob_inherited: return
+        #debugInheritance=self.path in ('/area','/obj','/mob','/atom/movable','/atom')
         if self.parent:
-            for key, value in self.parent.properties.items():
-                value = value.copy()
+            if not self.parent.ob_inherited: self.parent.InheritProperties()
+            for key in sorted(self.parent.properties.keys()):
+                value = self.parent.properties[key].copy()
                 if key not in self.properties:
                     self.properties[key] = value
                     self.properties[key].inherited = True
+                    #if debugInheritance:print('  {0}[{2}] -> {1}'.format(self.parent.path,self.path,key))
+        #assert 'name' in self.properties
+        self.ob_inherited=True
         for k in self.children.iterkeys():
             self.children[k].InheritProperties()
     
@@ -367,10 +381,15 @@ class Atom:
 class Proc(Atom):
     def __init__(self, path, arguments, filename='', line=0):
         Atom.__init__(self, path, filename, line)
+        self.name = self.figureOutName(self.path)
         self.arguments = arguments
         self.code = []  # (indent, line)
         self.definition = False
         self.origpath = ''
+        
+    def figureOutName(self,path):
+        name = path.split('(')[0]
+        return name.split('/')[-1]
         
     def CountTabs(self, line):
         m = REGEX_TABS.match(line)
@@ -391,6 +410,13 @@ class Proc(Atom):
     
     def InheritProperties(self):
         return
+    def getMinimumIndent(self):
+        # Find minimum indent level
+        for i in range(len(self.code)):
+            indent, _ = self.code[i]
+            if indent == 0: continue
+            return indent
+        return 0
     
     def _DumpCode(self):
         args = self.path[self.path.index('('):]
@@ -401,13 +427,7 @@ class Proc(Atom):
             true_path += ['proc']
         true_path += [name + args]
         o = '\n' + '/'.join(true_path) + '\n'
-        min_indent = 0
-        # Find minimum indent level
-        for i in range(len(self.code)):
-            indent, _ = self.code[i]
-            if indent == 0: continue
-            min_indent = indent
-            break
+        min_indent = self.getMinimumIndent()
         # Should be 1, so find the difference.
         indent_delta = 1 - min_indent
         # o += '\t// true_path  = {0}\n'.format(repr(true_path))

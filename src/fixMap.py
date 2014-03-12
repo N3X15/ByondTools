@@ -84,7 +84,7 @@ class StandardizeManifolds(Matcher):
         return 'Standardized pipe manifold'
     
 class StandardizePiping(Matcher):
-    TYPE_TRANSLATIONS={
+    TYPE_TRANSLATIONS = {
         '/obj/machinery/atmospherics/pipe/simple': 'simple',
         '/obj/machinery/atmospherics/pipe/manifold': 'manifold',
         '/obj/machinery/atmospherics/pipe/manifold4w': 'manifold4w',
@@ -98,51 +98,51 @@ class StandardizePiping(Matcher):
         '': 'general'
     }
     def __init__(self):
-        self.before=None
-        self.after=None
+        self.before = None
+        self.after = None
         return
         
-    def trans_simple(self,atom):
-        type_tmpl='/obj/machinery/atmospherics/pipe/simple/{color}/{visibility}'
-        color_code,visible = self.parseIconState(atom.getProperty('icon_state',''))
-        return self.getNewType(type_tmpl,color_code,visible)
+    def trans_simple(self, atom):
+        type_tmpl = '/obj/machinery/atmospherics/pipe/simple/{color}/{visibility}'
+        color_code, visible = self.parseIconState(atom.getProperty('icon_state', ''))
+        return self.getNewType(type_tmpl, color_code, visible)
         
-    def trans_manifold(self,atom):
-        type_tmpl='/obj/machinery/atmospherics/pipe/manifold/{color}/{visibility}'
-        color_code,visible = self.parseIconState(atom.getProperty('icon_state',''))
-        return self.getNewType(type_tmpl,color_code,visible)
+    def trans_manifold(self, atom):
+        type_tmpl = '/obj/machinery/atmospherics/pipe/manifold/{color}/{visibility}'
+        color_code, visible = self.parseIconState(atom.getProperty('icon_state', ''))
+        return self.getNewType(type_tmpl, color_code, visible)
         
-    def trans_manifold4w(self,atom):
-        type_tmpl='/obj/machinery/atmospherics/pipe/manifold4w/{color}/{visibility}'
-        color_code,visible = self.parseIconState(atom.getProperty('icon_state',''))
-        return self.getNewType(type_tmpl,color_code,visible)
+    def trans_manifold4w(self, atom):
+        type_tmpl = '/obj/machinery/atmospherics/pipe/manifold4w/{color}/{visibility}'
+        color_code, visible = self.parseIconState(atom.getProperty('icon_state', ''))
+        return self.getNewType(type_tmpl, color_code, visible)
         
-    def parseIconState(self,state):
+    def parseIconState(self, state):
         parts = state.split('-')
         if len(parts) <= 1:
-            return ('',True)
+            return ('', True)
         elif len(parts) == 2:
-            if parts[1]=='f':
-                return ('',True)
-            return (parts[1],True) 
-        return (parts[1],parts[2]!='f')
+            if parts[1] == 'f':
+                return ('', True)
+            return (parts[1], True) 
+        return (parts[1], parts[2] != 'f')
         
-    def getNewType(self,tmpl,color_code,visible, color_wheel = COLOR_CODES):
+    def getNewType(self, tmpl, color_code, visible, color_wheel=COLOR_CODES):
         visibility = 'visible'
         if not visible:
-            visibility='hidden'
+            visibility = 'hidden'
         color = color_wheel[color_code]
-        return Atom(tmpl.format(color=color,visibility=visibility))
+        return Atom(tmpl.format(color=color, visibility=visibility))
         
     def Matches(self, atom):
         return atom.path in self.TYPE_TRANSLATIONS
     
     def Fix(self, atom):
         self.before = atom.MapSerialize()
-        old_dir=None
+        old_dir = None
         if 'dir' in atom.mapSpecified:
-            old_dir = int(atom.getProperty('dir',2))
-        atom = getattr(self,'trans_{0}'.format(self.TYPE_TRANSLATIONS[atom.path]))(atom)
+            old_dir = int(atom.getProperty('dir', 2))
+        atom = getattr(self, 'trans_{0}'.format(self.TYPE_TRANSLATIONS[atom.path]))(atom)
         if old_dir is not None and old_dir != 2:
             atom.setProperty('dir', old_dir, PropertyFlags.MAP_SPECIFIED)
         self.after = atom.MapSerialize()
@@ -150,7 +150,7 @@ class StandardizePiping(Matcher):
     
     def __str__(self):
         if self.before is not None and self.after is not None:
-            return 'Standardized pipe: {0} -> {1}'.format(self.before,self.after)
+            return 'Standardized pipe: {0} -> {1}'.format(self.before, self.after)
         else:
             return 'Standardize pipes'
     
@@ -200,16 +200,16 @@ class FixWindows(Matcher):
     def Matches(self, atom):
         if atom.path.startswith('/obj/structure/window/full'):
             return False
-        if atom.path.startswith('/obj/structure/window') and int(atom.getProperty('dir', SOUTH)) in (NORTH|WEST,SOUTH|WEST,NORTH|EAST,SOUTH|EAST):
+        if atom.path.startswith('/obj/structure/window') and int(atom.getProperty('dir', SOUTH)) in (NORTH | WEST, SOUTH | WEST, NORTH | EAST, SOUTH | EAST):
             # print(atom.MapSerialize())
             return True
         return False
     
     def Fix(self, atom):
-        newtype = atom.path.replace('/obj/structure/window','/obj/structure/window/full')
-        atom.path=newtype
-        atom.properties={}
-        atom.mapSpecified=[]
+        newtype = atom.path.replace('/obj/structure/window', '/obj/structure/window/full')
+        atom.path = newtype
+        atom.properties = {}
+        atom.mapSpecified = []
         return atom
     
     def __str__(self):
@@ -297,7 +297,7 @@ class ChangeType(Matcher):
         return atom
     
     def __str__(self):
-        return 'Changed type from {0} to {1}'.format(self.old, self.new)
+        return 'Change type from {0} to {1}'.format(self.old, self.new)
 
 class FixNetwork(Matcher):
     def __init__(self):
@@ -400,6 +400,7 @@ class FixIDTags(Matcher):
         global atomsToFix
         if 'id_tag' in atom.properties:
             compiled_atom = self.tree.GetAtom(atom.path)
+            if compiled_atom is None: return False
             if 'id_tag' not in compiled_atom.properties:
                 atomsToFix[atom.path] = True
         return 'id' in atom.properties and 'id' in atom.mapSpecified
@@ -439,8 +440,15 @@ actions = [
     StandardizeAPCs(),
     FixWindows()
 ]
+
+tree = ObjectTree()
+tree.ProcessFilesFromDME('baystation12.dme')
+
 with open(sys.argv[2], 'r') as repl:
+    ln = 0
+    errors = 0
     for line in repl:
+        ln += 1
         if line.startswith('#'):
             continue
         if line.strip() == '':
@@ -448,22 +456,26 @@ with open(sys.argv[2], 'r') as repl:
         # PROPERTY: step_x > pixel_x
         # TYPE: /obj/item/key > /obj/item/weapon/key/janicart
         subject, action = line.split(':')
-        subject = type.lower()
+        subject = subject.lower()
         if subject == 'property':
             old, new = action.split('>')
             actions += [RenameProperty(old.strip(), new.strip())]
         if subject == 'type':
             old, new = action.split('>')
-            actions += [ChangeType(old.strip(), new.strip())]
-            
+            newtype = new.strip()
+            if tree.GetAtom(newtype) is None:
+                print('{0}:{1}: {2}'.format(sys.argv[2], ln, line.strip('\r\n')))
+                print('  ERROR: Unable to find replacement type "{0}".'.format(newtype))
+                errors += 1
+            actions += [ChangeType(old.strip(), newtype)]
+    if errors > 0:
+        print('!!! {0} errors, please fix them.'.format(errors))
+        sys.exit(1)
 print('Changes to make:')
 for action in actions:
     print(' * ' + str(action))
-
-tree = ObjectTree()
-tree.ProcessFilesFromDME('baystation12.dme')
-dmm = Map(tree)
-dmm.readMap(sys.argv[1])   
+dmm = Map(tree, forgiving_atom_lookups=1)
+dmm.readMap(sys.argv[1])
 dmm.writeMap2(sys.argv[1].replace('.dmm', '.dmm2'))
 for iid in xrange(len(dmm.instances)):
     atom = dmm.getInstance(iid)
@@ -471,16 +483,27 @@ for iid in xrange(len(dmm.instances)):
     for action in actions:
         action.SetTree(tree)
         if action.Matches(atom):
-            atom=action.Fix(atom)
+            atom = action.Fix(atom)
             changes += [str(action)]
-    atom.id=iid
-    dmm.setInstance(iid,atom)
+    atom.id = iid
+    
+    compiled_atom = tree.GetAtom(atom.path)
+    if compiled_atom is not None:
+        for propname in list(atom.properties.keys()):
+            if propname not in compiled_atom.properties and propname not in ('req_access_txt'):
+                del atom.properties[propname]
+                atom.mapSpecified.remove(propname)
+                changes += ['Dropped property {0} (not found in compiled atom)'.format(propname)]
+    dmm.setInstance(iid, atom)
     if len(changes) > 0:
-        print('{0} (#{1}):'.format(atom.path,atom.id))
+        print('{0} (#{1}):'.format(atom.path, atom.id))
         for change in changes:
             print(' * ' + change)
 for atom, _ in atomsToFix.items():
     print('Atom {0} needs id_tag.'.format(atom))
+with open(sys.argv[1] + '.missing', 'w') as f:
+    for atom in sorted(dmm.missing_atoms):
+        f.write(atom + "\n")
 print('--- Saving...')
 dmm.writeMap(sys.argv[1] + '.fixed', Map.WRITE_OLD_IDS)        
 dmm.writeMap2(sys.argv[1].replace('.dmm', '.dmm2') + '.fixed')

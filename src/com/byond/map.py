@@ -302,7 +302,7 @@ class Map:
     WRITE_OLD_IDS = 1
     
     READ_NO_BASE_COMP = 1
-    def __init__(self, tree=None):
+    def __init__(self, tree=None, **kwargs):
         self.filename = 'Unknown'
         self.readFlags = 0
         self.tileTypes = []
@@ -317,6 +317,8 @@ class Map:
         self.generatedTexAtlas = False
         self.selectedAreas = ()
         self.whitelistTypes = None
+        self.forgiving_atom_lookups=kwargs.get('forgiving_atom_lookups',False)
+        self.missing_atoms=set()
         
         self.log = logging.getLogger(__name__ + '.Map')
 
@@ -430,8 +432,13 @@ class Map:
                 inZLevel = False
                 if height == 0:
                     height = y
-                self.zLevels[z] = zLevel
+                newZ = MapLayer(self,height,width)
+                self.zLevels[z] = newZ
+                for ny in range(height):
+                    for nx in range(width):
+                        newZ.SetTileAt(nx, ny, zLevel.GetTileAt(nx, ny))
                 self.log.info('Added map layer {0} ({1}x{2})'.format(z, height, width))
+                #print(' * Added map layer {0} ({1}x{2})'.format(z, height, width))
                 continue
             if inZLevel:
                 if width == 0:
@@ -796,98 +803,7 @@ class Map:
             X + icon_width,
             Y + icon_height
         )
-    '''
-    def generateImage(self, filename_tpl, basedir='.', renderflags=0, **kwargs):
-        self.selectedAreas = ()
-        skip_alpha = False
-        render_types = ()
-        if 'area' in kwargs:
-            self.selectedAreas = kwargs['area']
-        if 'render_types' in kwargs:
-            render_types = kwargs['render_types']
-        if 'skip_alpha' in kwargs:
-            skip_alpha = kwargs['skip_alpha']
-        
-        # self.generateTexAtlas(basedir, renderflags)
-        
-        for tid in xrange(len(self.tileTypes)):
-            tile = self.tileTypes[tid]
-            tile.areaSelected = True
-            if len(self.selectedAreas) > 0:
-                for iid in tile.instances:
-                    atom = self.instances[iid]
-                    if atom.path.startswith('/area'):
-                        if  atom.path not in self.selectedAreas:
-                            tile.areaSelected = False
-                            break
-            self.tileTypes[tid] = tile
-            
-        print('--- Creating maps...')
-        for z in self.zLevels.keys():
-            if len(self.selectedAreas) > 0:
-                print('Checking z-level {0}...'.format(z))
-                thingsToDo = 0
-                for y in xrange(self.zLevels[z].height):
-                    for x in xrange(self.zLevels[z].width):
-                        tile = self.zLevels[z].GetTileAt(x, y)
-                        if tile is not None:
-                            if tile.areaSelected:
-                                thingsToDo += 1
-                if thingsToDo == 0:
-                    print(' Nothing to do, skipping.') 
-                    continue
-            
-            # Bounding box, used for cropping.
-            bbox = [99999, 99999, 0, 0]
-            
-            # Replace {z} with current z-level.
-            filename = filename_tpl.replace('{z}', str(z))
-            
-            # Leds do et!
-            # TODO: Only render tiles within the bounding box
-            zpic = Image.new('RGBA', ((self.zLevels[z].width + 2) * 32, (self.zLevels[z].height + 2) * 32), "black")
-            nSelAreas = 0
-            for render_pass in xrange(2): 
-                print(' Rendering {0} (pass #{1})...'.format(filename, render_pass + 1))
-                for y in xrange(self.zLevels[z].height):
-                    for x in xrange(self.zLevels[z].width):
-                        tile = self.zLevels[z].GetTileAt(x, y)
-                        if tile is not None:
-                            frame = tile.RenderToMapTile(render_pass, basedir, renderflags, render_types=render_types, skip_alpha=skip_alpha)
-                            # Wait for next pass, or failed to get an image.
-                            if frame is None: continue
-                            x_o = 0
-                            y_o = 32 - frame.size[1]  # BYOND uses LOWER left as origin for some fucking reason
-                            new_bb = ((x * 32) + x_o + tile.offset[0], (y * 32) + y_o + tile.offset[1], (x * 32) + frame.size[0] + x_o + tile.offset[0], (y * 32) + frame.size[0] + y_o + tile.offset[1])
-                            if tile.areaSelected or len(self.selectedAreas) == 0:
-                                # Adjust cropping bounds 
-                                if new_bb[0] < bbox[0]:
-                                    bbox[0] = new_bb[0]
-                                if new_bb[1] < bbox[1]:
-                                    bbox[1] = new_bb[1]
-                                if new_bb[2] > bbox[2]:
-                                    bbox[2] = new_bb[2]
-                                if new_bb[3] > bbox[3]:
-                                    bbox[3] = new_bb[3]
-                                nSelAreas += 1
-                            zpic.paste(frame, new_bb, frame)
-            
-            if len(self.selectedAreas) == 0:            
-                # Autocrop (only works if NOT rendering stars or areas)
-                zpic = trim(zpic)
-            else:
-                if nSelAreas == 0:
-                    continue
-                zpic = zpic.crop(bbox)
-            
-            if zpic is not None:
-                # Saev
-                filedir = os.path.dirname(filename)
-                if not os.path.isdir(filedir):
-                    os.makedirs(filedir)
-                print(' -> {} ({}x{})'.format(filename, zpic.size[0], zpic.size[1]))
-                zpic.save(filename, 'PNG')
-    '''
+
     def consumeTiles(self, f):
         index = 0
         self.duplicates = 0
@@ -940,7 +856,10 @@ class Map:
     # So we can read a map without parsing the tree.
     def GetAtom(self, path):
         if self.tree is not None:
-            return self.tree.GetAtom(path)
+            atom = self.tree.GetAtom(path)
+            if atom is None and self.forgiving_atom_lookups:
+                self.missing_atoms.add(path)
+                return Atom(path)
         return Atom(path)
     
     def consumeTileAtoms(self, line, lineNumber):
