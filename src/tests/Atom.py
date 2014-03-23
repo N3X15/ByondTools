@@ -4,7 +4,7 @@ Created on Jan 1, 2014
 @author: Rob
 '''
 import unittest
-from com.byond.basetypes import Atom, BYONDString, BYONDValue
+from byond.basetypes import Atom, BYONDString, BYONDValue
 
 class AtomTest(unittest.TestCase):
     def test_copy_consistency(self):

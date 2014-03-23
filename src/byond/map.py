@@ -1,8 +1,8 @@
 import os, itertools, sys
-from com.byond.DMI import DMI
-from com.byond.directions import SOUTH, IMAGE_INDICES
-from com.byond.basetypes import Atom, BYONDString, BYONDValue, BYONDFileRef
-# from com.byond.objtree import ObjectTree
+from byond.DMI import DMI
+from byond.directions import SOUTH, IMAGE_INDICES
+from byond.basetypes import Atom, BYONDString, BYONDValue, BYONDFileRef
+# from byond.objtree import ObjectTree
 from PIL import Image, ImageChops
 import logging
 

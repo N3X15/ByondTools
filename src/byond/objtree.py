@@ -1,20 +1,17 @@
 '''
 Superficially generate an object/property tree.
 '''
-import re, logging, os, sys
+import re, logging, os
 
 try:
     import cPickle as pickle
 except:
     import pickle
    
-from .basetypes import *
+from .basetypes import Atom, Proc, BYONDValue, BYONDString, BYONDFileRef
 from .utils import md5sum
 
-REGEX_TABS = re.compile('^(?P<tabs>[\t\s]*)')  # \s*$
-# REGEX_VARIABLE_STRING   = re.compile('^(?P<tabs>\t+)(?:var/)?(?P<type>[a-zA-Z0-9_]*/)?(?P<variable>[a-zA-Z0-9_]+)\s*=\s*(?P<qmark>[\'"])(?P<content>.+)(?P=qmark)\s*$')
-# REGEX_VARIABLE_NUMBER   = re.compile('^(?P<tabs>\t+)(?:var/)?(?P<type>[a-zA-Z0-9_]*/)?(?P<variable>[a-zA-Z0-9_]+)\s*=\s*(?P<content>[0-9\.\-]+)\s*$')
-# REGEX_VARIABLE_DATUM    = re.compile('^(?P<tabs>\t+)(?:var/)?(?P<type>[a-zA-Z0-9_/]*/)?(?P<variable>[a-zA-Z0-9_]+)\s*=\s*(?P<content>[0-9\.\-]+)\s*$')
+REGEX_TABS = re.compile('^(?P<tabs>[\t\s]*)')
 REGEX_ATOMDEF = re.compile('^(?P<tabs>\t*)(?P<atom>[a-zA-Z0-9_/]+)\\{?\\s*$')
 REGEX_ABSOLUTE_PROCDEF = re.compile('^(?P<tabs>\t*)(?P<atom>[a-zA-Z0-9_/]+)/(?P<proc>[a-zA-Z0-9_]+)\((?P<args>.*)\)\\{?\s*$')
 REGEX_RELATIVE_PROCDEF = re.compile('^(?P<tabs>\t*)(?P<proc>[a-zA-Z0-9_]+)\((?P<args>.*)\)\\{?\\s*$')
@@ -96,9 +93,16 @@ class ObjectTree:
         'atom_defaults.dm'
     )
     def __init__(self, **options):
-        self.LoadedStdLib = False
+        #: All atoms, in a list.
         self.Atoms = {}
+        
+        #: All atoms, in a tree-node structure.
         self.Tree = Atom('')
+        
+        #: Skip loading from .OTR?
+        self.skip_otr = False
+        
+        self.LoadedStdLib = False
         self.cpath = []
         self.popLevels = []
         self.InProc = []
@@ -116,14 +120,13 @@ class ObjectTree:
         self.comments = []
         self.fileLayouts = {}
         self.LeavePreprocessorDirectives = options.get('preprocessor_directives', False)
-        self.skip_otr = False
         
         nit = self.ignoreTokens.copy()
         for _, stop in self.ignoreTokens.iteritems():
             nit[stop] = None
         self.ignoreTokens = nit
         
-        self.defines['__OBJTREE']=BYONDValue('1')
+        self.defines['__OBJTREE'] = BYONDValue('1')
     
     def ProcessMultiString(self, filename, line, ignoreLevels, current_buffer):
         return '"{0}"'.format(current_buffer)
@@ -353,17 +356,17 @@ class ObjectTree:
             self.AddCodeToProc(self.ignoreStartIndent, self.comment)
         self.comment = ''
         
-    def ob_force_parent(self,context,newparent):
+    def ob_force_parent(self, context, newparent):
         '''
         Used internally to force the parent of an object.
         '''
         context.ob_forced_parent = newparent
         
-    def handleOBToken(self,name,context,params):
+    def handleOBToken(self, name, context, params):
         if context is not None:
             context = self.Atoms[context]
         name = 'ob_{0}'.format(name.lower())
-        getattr(self,name)(context,*params)
+        getattr(self, name)(context, *params)
         
     def ProcessFile(self, filename):
         self.cpath = []
@@ -463,9 +466,9 @@ class ObjectTree:
                 # Preprocessing defines.
                 if line.strip().startswith("#"):
                     if line.endswith('\\'): continue
-                    tokenChunks=line.split('#')
-                    tokenChunks=tokenChunks[1].split()
-                    directive=tokenChunks[0]
+                    tokenChunks = line.split('#')
+                    tokenChunks = tokenChunks[1].split()
+                    directive = tokenChunks[0]
                     if directive == 'define':
                         # #define SOMETHING Value
                         defineChunks = line.split(None, 3)
@@ -495,9 +498,9 @@ class ObjectTree:
                         if m is not None:
                             numtabs = len(m.group('tabs'))
                         atom = self.DetermineContext(filename, ln, line, numtabs)
-                        #if atom is None: continue
-                        #print('OBTOK {0}'.format(repr(tokenChunks)))
-                        self.handleOBToken(tokenChunks[0].replace('__OB_',''),atom,tokenChunks[1:])
+                        # if atom is None: continue
+                        # print('OBTOK {0}'.format(repr(tokenChunks)))
+                        self.handleOBToken(tokenChunks[0].replace('__OB_', ''), atom, tokenChunks[1:])
                         # self.fileLayout += [('OBTOK', atom.path)]
                         continue
                     else:
@@ -669,8 +672,8 @@ class ObjectTree:
                                 cNode.children[path_item] = Atom('/'.join([''] + cpath))
                         cNode.children[path_item].parent = cNode
                         if cNode.children[path_item].ob_forced_parent:
-                            print(' - Parent of {0} forced to be {1}'.format(cNode.children[path_item].path,cNode.children[path_item].ob_forced_parent))
-                            cNode.children[path_item].parent=self.Atoms[cNode.children[path_item].ob_forced_parent]
+                            print(' - Parent of {0} forced to be {1}'.format(cNode.children[path_item].path, cNode.children[path_item].ob_forced_parent))
+                            cNode.children[path_item].parent = self.Atoms[cNode.children[path_item].ob_forced_parent]
                     cNode = cNode.children[path_item]
         self.Tree.InheritProperties()
         print('Processed {0} atoms.'.format(len(self.Atoms)))

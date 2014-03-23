@@ -1,7 +1,7 @@
 import os, argparse
-from com.byond.objtree import ObjectTree
-from com.byond.basetypes import Atom
-from com.byond.map import Map, MapRenderFlags
+from byond.objtree import ObjectTree
+from byond.basetypes import Atom
+from byond.map import Map, MapRenderFlags
 """
 Usage:
     $ python generateMap.py path/to/your/project.dme path/to/your/map.dmm

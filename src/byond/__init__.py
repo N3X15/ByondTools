@@ -4,7 +4,9 @@ Created on Sep 21, 2013
 @author: Rob
 '''
 import os
-from com.byond.map import Map 
+
+from .map import Map, Tile
+from .objtree import ObjectTree
 
 def GetFilesFromDME(dmefile='baystation12.dme', ext='.dm'):
     filesInDME=[]

@@ -27,8 +27,8 @@ THE SOFTWARE.
 
 """
 import os, sys, re
-from com.byond.objtree import ObjectTree
-from com.byond.basetypes import Atom, Proc
+from byond.objtree import ObjectTree
+from byond.basetypes import Atom, Proc
 
 # Calculated Max Tech Levels.
 CMTLs = {}

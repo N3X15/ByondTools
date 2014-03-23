@@ -4,8 +4,8 @@ Created on Jan 5, 2014
 @author: Rob
 '''
 import os, sys, argparse
-from com.byond.basetypes import Atom, Proc
-from com.byond import objtree, GetFilesFromDME
+from byond.basetypes import Atom, Proc
+from byond import objtree, GetFilesFromDME
 
 def processFile(tree, origin, destination, args):
     atomsWritten=[]

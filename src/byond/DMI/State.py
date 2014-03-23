@@ -1,4 +1,4 @@
-from com.byond import directions
+from byond import directions
 from PIL import Image
 import logging
 

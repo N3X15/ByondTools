@@ -5,7 +5,7 @@ Created on Feb 23, 2013
 '''
 from .Directive import Directive
 from .Import import Import
-from com.byond.DMI import State
+from byond.DMI import State
 from .. import Variable
 
 directly_assignable={

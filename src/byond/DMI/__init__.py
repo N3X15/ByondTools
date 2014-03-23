@@ -3,7 +3,7 @@ import sys, os, glob, string, traceback, fnmatch, math, shutil, collections
 
 from PIL import Image, PngImagePlugin
 from .State import State
-from com.byond.DMIH import *
+from byond.DMIH import *
 import logging
 
 class DMILoadFlags:

@@ -4,8 +4,8 @@ Created on Feb 26, 2014
 @author: Rob
 '''
 import unittest
-from com.byond.map import Map
-
+from byond.map import Map
+'''
 class MapRenderingTest(unittest.TestCase):
     def setUp(self):
         self.dmm = Map()
@@ -32,4 +32,4 @@ class MapRenderingTest(unittest.TestCase):
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']
-    unittest.main()
+    unittest.main()'''

@@ -1,5 +1,5 @@
-from com.byond.DMI import DMI,State
-from com.byond import directions
+from byond.DMI import DMI,State
+from byond import directions
 import os, sys, shutil
 import ImageChops
 import math, operator

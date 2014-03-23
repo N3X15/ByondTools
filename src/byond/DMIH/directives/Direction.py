@@ -4,7 +4,7 @@ Created on Feb 23, 2013
 @author: Rob
 '''
 from .Directive import Directive
-from com.byond import directions
+from byond import directions
  
 class Direction(Directive):
     '''

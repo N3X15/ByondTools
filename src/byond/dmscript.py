@@ -8,7 +8,7 @@ Used for things.  Like maps.
 Represents a line parsed from the source.
 """
 import copy
-# from com.byond.map import Atom
+# from byond.map import Atom
 from ply import *
 
 # This is how everything ticks.  Derived from http://www.byond.com/forum/?post=87746

@@ -27,8 +27,8 @@ THE SOFTWARE.
 
 """
 import os, sys
-from com.byond.objtree import ObjectTree
-from com.byond.map import Map, MapRenderFlags
+from byond.objtree import ObjectTree
+from byond.map import Map, MapRenderFlags
 
 tmpl_head = '''
 <html>

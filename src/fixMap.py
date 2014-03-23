@@ -6,10 +6,10 @@ fixMap.py map.dmm replacements.txt
 * Replaces old shit with /vg/ shit.
 """
 import sys
-from com.byond.map import Map
-from com.byond.objtree import ObjectTree
-from com.byond.basetypes import BYONDString, BYONDValue, Atom, PropertyFlags
-from com.byond.directions import *
+from byond.map import Map
+from byond.objtree import ObjectTree
+from byond.basetypes import BYONDString, BYONDValue, Atom, PropertyFlags
+from byond.directions import *
 
 class Matcher:
     def Matches(self, atom):

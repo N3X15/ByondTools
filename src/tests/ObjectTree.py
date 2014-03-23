@@ -4,7 +4,7 @@ Created on Jan 5, 2014
 @author: Rob
 '''
 import unittest
-from com.byond.objtree import ObjectTree
+from byond.objtree import ObjectTree
 class ObjectTreeTests(unittest.TestCase):
     def setUp(self):
         self.tree = ObjectTree()

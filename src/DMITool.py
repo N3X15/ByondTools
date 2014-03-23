@@ -10,7 +10,7 @@ Written for Python 2.7.
 
 import sys, os, traceback, fnmatch, argparse
 
-from com.byond.DMI import DMI
+from byond.DMI import DMI
 
 args = ()
 	

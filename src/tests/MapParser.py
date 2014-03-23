@@ -4,7 +4,7 @@ Created on Jan 1, 2014
 @author: Rob
 '''
 import unittest
-from com.byond.map import Map, Tile
+from byond.map import Map, Tile
 
 class MapParserTest(unittest.TestCase):
     def setUp(self):

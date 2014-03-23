@@ -3,7 +3,7 @@ Created on Feb 28, 2014 to test a bug in DreamMaker.
 
 Requires arial font.
 '''
-from com.byond.DMI import DMI, State
+from byond.DMI import DMI, State
 from PIL import Image, ImageDraw, ImageFont
 
 def makeDMI():

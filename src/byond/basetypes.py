@@ -143,7 +143,7 @@ class Atom:
         #: Vars of this atom, including inherited vars.
         self.properties = {}
         
-        #: List of var names that were specified by the map, if atom was loaded from a :class:`com.byond.map.Map`.
+        #: List of var names that were specified by the map, if atom was loaded from a :class:`byond.map.Map`.
         self.mapSpecified = []
         
         #: Child atoms and procs.
@@ -174,7 +174,7 @@ class Atom:
         '''
         Make a copy of this atom, without dangling references.
         
-        :returns com.byond.basetypes.Atom
+        :returns byond.basetypes.Atom
         '''
         new_node = Atom(self.path)
         new_node.properties = self.properties.copy()
