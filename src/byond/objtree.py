@@ -170,7 +170,7 @@ class ObjectTree:
                 
         ToRead = []
         if not self.LoadedStdLib and kwargs.get('load_stdlib', True):
-            stdlib_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+            stdlib_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
             stdlib_dir = os.path.join(stdlib_dir, 'stdlib')
             for filename in self.stdlib_files:
                 # self.ProcessFile(os.path.join(stdlib_dir, filename))
