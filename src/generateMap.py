@@ -1,4 +1,4 @@
-import os, argparse
+import os, argparse, logging
 from byond.objtree import ObjectTree
 from byond.basetypes import Atom
 from byond.map import Map, MapRenderFlags
@@ -42,6 +42,13 @@ def renderMap(args):
         outfile = args.outfile
     dmm.generateImage(outfile, os.path.dirname(args.project), renderflags, **kwargs)
 
+logging.basicConfig(
+    format='%(asctime)s [%(levelname)-8s]: %(message)s', 
+    datefmt='%m/%d/%Y %I:%M:%S %p', 
+    level=logging.INFO#,
+    #filename='logs/main.log',
+    #filemode='w'
+    )
 opt = argparse.ArgumentParser()
 opt.add_argument('project', metavar="project.dme")
 opt.add_argument('map', metavar="map.dmm")

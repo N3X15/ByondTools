@@ -165,9 +165,6 @@ class Atom:
         self.old_id = None
         
         #: Used internally.
-        self.ob_forced_parent=None
-        
-        #: Used internally.
         self.ob_inherited=False
         
     def copy(self):
@@ -181,7 +178,6 @@ class Atom:
         new_node.mapSpecified = self.mapSpecified
         new_node.id = self.id
         new_node.old_id = self.old_id
-        new_node.ob_forced_parent = self.ob_forced_parent
         # new_node.parent = self.parent
         return new_node
     
@@ -199,6 +195,8 @@ class Atom:
         prop = self.properties.get(index, None)
         if prop == None:
             return default
+        elif prop == 'null':
+            return None
         return prop.value
     
     def setProperty(self, index, value, flags=0):
@@ -252,7 +250,8 @@ class Atom:
         if self.ob_inherited: return
         #debugInheritance=self.path in ('/area','/obj','/mob','/atom/movable','/atom')
         if self.parent:
-            if not self.parent.ob_inherited: self.parent.InheritProperties()
+            if not self.parent.ob_inherited:
+                self.parent.InheritProperties()
             for key in sorted(self.parent.properties.keys()):
                 value = self.parent.properties[key].copy()
                 if key not in self.properties:

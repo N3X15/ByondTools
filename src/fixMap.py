@@ -490,9 +490,10 @@ for iid in xrange(len(dmm.instances)):
     compiled_atom = tree.GetAtom(atom.path)
     if compiled_atom is not None:
         for propname in list(atom.properties.keys()):
-            if propname not in compiled_atom.properties and propname not in ('req_access_txt'):
+            if propname not in compiled_atom.properties and propname not in ('req_access_txt','req_one_access_txt'):
                 del atom.properties[propname]
-                atom.mapSpecified.remove(propname)
+                if propname in atom.mapSpecified:
+                    atom.mapSpecified.remove(propname)
                 changes += ['Dropped property {0} (not found in compiled atom)'.format(propname)]
     dmm.setInstance(iid, atom)
     if len(changes) > 0:

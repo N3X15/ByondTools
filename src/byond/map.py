@@ -567,10 +567,12 @@ class Map:
                 
     def renderAtom(self, atom, basedir, skip_alpha=False):
         if 'icon' not in atom.properties:
-            logging.critical('UNKNOWN ICON IN ATOM #{0}'.format(atom.id))
+            logging.critical('UNKNOWN ICON IN ATOM #{0} ({1})'.format(atom.id,atom.path))
             logging.info(atom.MapSerialize())
             logging.info(atom.MapSerialize(Atom.FLAG_INHERITED_PROPERTIES))
             return None
+        #else:
+        #    logging.info('Icon found for #{}.'.format(atom.id))
         
         dmi_file = atom.properties['icon'].value
         
@@ -860,6 +862,7 @@ class Map:
             if atom is None and self.forgiving_atom_lookups:
                 self.missing_atoms.add(path)
                 return Atom(path)
+            return atom
         return Atom(path)
     
     def consumeTileAtoms(self, line, lineNumber):

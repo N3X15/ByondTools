@@ -22,7 +22,7 @@ def debug(filename, line, path, message):
     
 class OTRCache:
     # : Only used for obliterating outdated data.
-    VERSION = [11, 3, 2014]
+    VERSION = [24, 4, 2014]
     
     def __init__(self, filename):
         self.filename = filename
@@ -356,12 +356,6 @@ class ObjectTree:
             self.AddCodeToProc(self.ignoreStartIndent, self.comment)
         self.comment = ''
         
-    def ob_force_parent(self, context, newparent):
-        '''
-        Used internally to force the parent of an object.
-        '''
-        context.ob_forced_parent = newparent
-        
     def handleOBToken(self, name, context, params):
         if context is not None:
             context = self.Atoms[context]
@@ -671,9 +665,10 @@ class ObjectTree:
                             else:
                                 cNode.children[path_item] = Atom('/'.join([''] + cpath))
                         cNode.children[path_item].parent = cNode
-                        if cNode.children[path_item].ob_forced_parent:
-                            print(' - Parent of {0} forced to be {1}'.format(cNode.children[path_item].path, cNode.children[path_item].ob_forced_parent))
-                            cNode.children[path_item].parent = self.Atoms[cNode.children[path_item].ob_forced_parent]
+                        parent_type = cNode.children[path_item].getProperty('parent_type')
+                        if parent_type is not None:
+                            print(' - Parent of {0} forced to be {1}'.format(cNode.children[path_item].path, repr(parent_type)))
+                            cNode.children[path_item].parent = self.Atoms[parent_type]
                     cNode = cNode.children[path_item]
         self.Tree.InheritProperties()
         print('Processed {0} atoms.'.format(len(self.Atoms)))
