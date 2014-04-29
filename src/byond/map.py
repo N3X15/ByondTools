@@ -861,7 +861,7 @@ class Map:
             atom = self.tree.GetAtom(path)
             if atom is None and self.forgiving_atom_lookups:
                 self.missing_atoms.add(path)
-                return Atom(path)
+                return Atom(path, self.filename,missing=True)
             return atom
         return Atom(path)
     

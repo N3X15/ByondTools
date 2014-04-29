@@ -134,7 +134,7 @@ class Atom:
     #: writeMap2 prints old_ids instead of the actual IID.
     FLAG_USE_OLD_ID = 2  
     
-    def __init__(self, path, filename='', line=0):
+    def __init__(self, path, filename='', line=0, **kwargs):
         global TURF_LAYER, AREA_LAYER, OBJ_LAYER, MOB_LAYER
         
         #: Absolute path of this atom
@@ -167,13 +167,18 @@ class Atom:
         #: Used internally.
         self.ob_inherited=False
         
+        #: Loaded from map, but missing in the code. (Maps only)
+        self.missing=kwargs.get('missing',False)
+        
+        #if not self.missing and path == '/area/engine/engineering':
+        #    raise Exception('God damnit')
     def copy(self):
         '''
         Make a copy of this atom, without dangling references.
         
         :returns byond.basetypes.Atom
         '''
-        new_node = Atom(self.path)
+        new_node = Atom(self.path,self.filename,self.line,missing=self.missing)
         new_node.properties = self.properties.copy()
         new_node.mapSpecified = self.mapSpecified
         new_node.id = self.id

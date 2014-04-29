@@ -22,7 +22,7 @@ def debug(filename, line, path, message):
     
 class OTRCache:
     # : Only used for obliterating outdated data.
-    VERSION = [24, 4, 2014]
+    VERSION = [28, 4, 2014]
     
     def __init__(self, filename):
         self.filename = filename
@@ -663,7 +663,7 @@ class ObjectTree:
                             if '(' in path_item:
                                 cNode.children[path_item] = Proc('/'.join([''] + cpath), [])
                             else:
-                                cNode.children[path_item] = Atom('/'.join([''] + cpath))
+                                cNode.children[path_item] = Atom('/'.join([''] + cpath),"MakeTree() - "+'/'.join(fullpath))
                         cNode.children[path_item].parent = cNode
                         parent_type = cNode.children[path_item].getProperty('parent_type')
                         if parent_type is not None:
