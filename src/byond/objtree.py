@@ -663,7 +663,7 @@ class ObjectTree:
                             if '(' in path_item:
                                 cNode.children[path_item] = Proc('/'.join([''] + cpath), [])
                             else:
-                                cNode.children[path_item] = Atom('/'.join([''] + cpath),"MakeTree() - "+'/'.join(fullpath))
+                                cNode.children[path_item] = Atom('/'.join([''] + cpath),atom.filename,atom.line)
                         cNode.children[path_item].parent = cNode
                         parent_type = cNode.children[path_item].getProperty('parent_type')
                         if parent_type is not None:
