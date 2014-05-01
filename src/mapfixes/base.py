@@ -23,6 +23,17 @@ class MapFix(object):
         MapFix.all[self.category][self.id] = c
         return c
     
+_dependencies = {}
+
+def DeclareDependencies(dependee,dependencies):
+    if dependee not in _dependencies:
+        _dependencies[dependee] = []
+    _dependencies[dependee] += dependencies
+    print('  Dependencies: {}'.format(dependencies))
+    
+def GetDependencies():
+    return _dependencies
+
 class Matcher:
     def Matches(self, atom):
         return False
@@ -59,7 +70,7 @@ class RenameProperty(Matcher):
         self.removed = False
         
     def Matches(self, atom):
-        if self.old in atom.properties:
+        if self.old in atom.properties and self.old in atom.mapSpecified:
             return True
         return False
     

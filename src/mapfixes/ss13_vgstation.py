@@ -2,11 +2,11 @@
 /vg/station-specific fixes.
 '''
 
-from .base import Matcher,MapFix
+from .base import Matcher,MapFix,RenameProperty,DeclareDependencies
 from byond.basetypes import BYONDString, BYONDValue, Atom, PropertyFlags
 from byond.directions import *
 
-dependencies={'vgstation':['ss13']}
+DeclareDependencies('vgstation',['ss13'])
 
 @MapFix('vgstation')
 class FixNetwork(Matcher):
@@ -289,3 +289,8 @@ class FixVaultFloors(Matcher):
     
     def __str__(self):
         return 'Standardized vault flooring (' + ', '.join(self.changesMade) + ')'
+    
+@MapFix('vgstation')
+class RenameColorVG(RenameProperty):
+    def __init__(self):
+        RenameProperty.__init__(self, "color", "_color")

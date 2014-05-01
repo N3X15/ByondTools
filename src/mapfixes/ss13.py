@@ -21,7 +21,7 @@ class StandardizeAPCs(Matcher):
                 if setting not in ('name', 'pixel_x', 'pixel_y', 'tag', 'dir'):
                     nonstandard_settings += [setting]
             if len(nonstandard_settings) > 0:
-                print('Non-standard APC: Has strange settings - ' + ', '.join(nonstandard_settings))
+                print('Non-standard APC #{}: Has strange settings - {}'.format(atom.id,', '.join(nonstandard_settings)))
             else:
                 if 'name' in atom.properties and 'name' in atom.mapSpecified:
                     self.actions |= self.ACT_CLEAR_NAME
@@ -38,11 +38,11 @@ class StandardizeAPCs(Matcher):
                 else:
                     self.pixel_y = -24
             else:
+                self.pixel_y = 0
                 if(direction == 4): 
                     self.pixel_x = 24 
                 else:
                     self.pixel_x = -24
-                self.pixel_y = 0
             if self.pixel_x != c_pixel_x or self.pixel_y != c_pixel_y:
                 self.actions |= self.ACT_FIX_OFFSET
         return self.actions != 0
