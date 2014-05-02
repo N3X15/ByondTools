@@ -80,7 +80,9 @@ class Tile:
     def GetAtoms(self):
         atoms = []
         for instance in self.instances:
-            atoms += [self.map.getInstance(instance)]
+            atom = self.map.getInstance(instance)
+            if atom is None: continue
+            atoms += [atom]
         return atoms
     
     def SortAtoms(self):
@@ -685,6 +687,7 @@ class Map:
                                 renderThis = False
                     if not renderThis: continue
                 for atom in t.GetAtoms():
+                    if atom is None: continue
                     iid = atom.id
                     if atom.path.startswith('/area'):
                         if  atom.path not in self.selectedAreas:
