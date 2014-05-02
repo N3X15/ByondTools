@@ -273,24 +273,34 @@ class MapLayer:
     def SetTileAt(self, x, y, tile):
         grow = False
         if y >= self.height:
-            self.height = y - 1
+            self.height = y + 1
             grow = True
         if x >= self.width:
-            self.width = x - 1
+            self.width = x + 1
             grow = True
         if grow:
             self.grow()
-        
-        self.tiles[y][x] = tile.ID
+        try:
+            self.tiles[y][x] = tile.ID
+        except IndexError:
+            logging.critical('Failed to set self.tiles[{}][{}]: IndexError'.format(y, x))
+            logging.critical('width: {}'.format(self.width))
+            logging.critical('height: {}'.format(self.height))
+            logging.critical('real width: {}'.format(len(self.tiles)))
+            logging.critical('real height: {}'.format(len(self.tiles[0])))
+            sys.exit(1)
     
     def grow(self):
         gamt = self.height - len(self.tiles)
-        print('y+=' + str(gamt))
-        self.tiles += [[0] for _ in xrange(gamt)]
+        if gamt > 0:
+            logging.debug('y += ' + str(gamt))
+            self.tiles += [[0] for _ in xrange(gamt)]
+        gamt = 0
         for y in range(len(self.tiles)):
             gamt = self.width - len(self.tiles[y])
-            print('x[{}]+={}'.format(y, gamt))
-            self.tiles[y] += [0 for _ in xrange(self.width - len(self.tiles[y]))]
+            if gamt > 0:
+                self.tiles[y] += [0 for _ in xrange(gamt)]
+                logging.debug('x[{}] += {}'.format(y, gamt))
         
     def GetTileAt(self, x, y):
         # print(repr(self.tiles))
@@ -319,8 +329,8 @@ class Map:
         self.generatedTexAtlas = False
         self.selectedAreas = ()
         self.whitelistTypes = None
-        self.forgiving_atom_lookups=kwargs.get('forgiving_atom_lookups',False)
-        self.missing_atoms=set()
+        self.forgiving_atom_lookups = kwargs.get('forgiving_atom_lookups', False)
+        self.missing_atoms = set()
         
         self.log = logging.getLogger(__name__ + '.Map')
 
@@ -434,17 +444,19 @@ class Map:
                 inZLevel = False
                 if height == 0:
                     height = y
-                newZ = MapLayer(self,height,width)
+                newZ = MapLayer(self, height, width)
                 self.zLevels[z] = newZ
                 for ny in range(height):
                     for nx in range(width):
                         newZ.SetTileAt(nx, ny, zLevel.GetTileAt(nx, ny))
                 self.log.info('Added map layer {0} ({1}x{2})'.format(z, height, width))
-                #print(' * Added map layer {0} ({1}x{2})'.format(z, height, width))
+                # print(' * Added map layer {0} ({1}x{2})'.format(z, height, width))
                 continue
             if inZLevel:
                 if width == 0:
                     width = len(line) / self.idlen
+                if width > 255:
+                    logging.warn("Warning: Line is {} blocks long!".format(width))
                 x = 0
                 for chunk in chunker(line.strip(), self.idlen):
                     chunk = ''.join(chunk)
@@ -569,11 +581,11 @@ class Map:
                 
     def renderAtom(self, atom, basedir, skip_alpha=False):
         if 'icon' not in atom.properties:
-            logging.critical('UNKNOWN ICON IN ATOM #{0} ({1})'.format(atom.id,atom.path))
+            logging.critical('UNKNOWN ICON IN ATOM #{0} ({1})'.format(atom.id, atom.path))
             logging.info(atom.MapSerialize())
             logging.info(atom.MapSerialize(Atom.FLAG_INHERITED_PROPERTIES))
             return None
-        #else:
+        # else:
         #    logging.info('Icon found for #{}.'.format(atom.id))
         
         dmi_file = atom.properties['icon'].value
@@ -864,7 +876,7 @@ class Map:
             atom = self.tree.GetAtom(path)
             if atom is None and self.forgiving_atom_lookups:
                 self.missing_atoms.add(path)
-                return Atom(path, self.filename,missing=True)
+                return Atom(path, self.filename, missing=True)
             return atom
         return Atom(path)
     
