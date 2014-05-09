@@ -4,9 +4,10 @@ Created on Jan 5, 2014
 @author: Rob
 '''
 import unittest
-from byond.objtree import ObjectTree
+
 class ObjectTreeTests(unittest.TestCase):
     def setUp(self):
+        from byond.objtree import ObjectTree
         self.tree = ObjectTree()
         
     def test_consumeVariable_basics(self):

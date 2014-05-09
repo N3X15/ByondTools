@@ -4,10 +4,10 @@ Created on Jan 1, 2014
 @author: Rob
 '''
 import unittest
-from byond.map import Map, Tile
 
 class MapParserTest(unittest.TestCase):
     def setUp(self):
+        from byond.map import Map, Tile
         self.dmm = Map()
     
     def test_basic_SplitAtoms_operation(self):
@@ -25,6 +25,7 @@ class MapParserTest(unittest.TestCase):
         self.assertListEqual(out, expectedOutput)
     
     def test_basic_consumeTile_operation(self):
+        from byond.map import Map, Tile
         '''
         "aaK" = (
             /obj/structure/cable{
@@ -58,6 +59,7 @@ class MapParserTest(unittest.TestCase):
         self.assertEqual(out.MapSerialize(Tile.FLAG_USE_OLD_ID), testStr)
         
     def test_consumeTile_landmark(self):
+        from byond.map import Map, Tile
         testStr='"aah" = (/obj/effect/landmark{name = "carpspawn"},/obj/structure/lattice,/turf/space,/area)'
         out = self.dmm.consumeTile(testStr, 0)
         self.assertEqual(out.MapSerialize(Tile.FLAG_USE_OLD_ID), testStr)

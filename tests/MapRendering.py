@@ -4,7 +4,7 @@ Created on Feb 26, 2014
 @author: Rob
 '''
 import unittest
-from byond.map import Map
+#from byond.map import Map
 '''
 class MapRenderingTest(unittest.TestCase):
     def setUp(self):

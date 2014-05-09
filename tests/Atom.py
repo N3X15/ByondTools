@@ -4,10 +4,10 @@ Created on Jan 1, 2014
 @author: Rob
 '''
 import unittest
-from byond.basetypes import Atom, BYONDString, BYONDValue
 
 class AtomTest(unittest.TestCase):
     def test_copy_consistency(self):
+        from byond.basetypes import Atom, BYONDString, BYONDValue
         atom = Atom('/datum/test',__file__,0)
         atom.properties={
             'dir': BYONDValue(2),

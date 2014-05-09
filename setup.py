@@ -12,5 +12,6 @@ setup(name='BYONDTools',
     install_requires=[
         'Pillow'
     ],
+    test_suite='tests',
     scripts=glob.glob("scripts/*.py"),
     zip_safe=False)
