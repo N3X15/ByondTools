@@ -25,7 +25,7 @@ class MapFix(object):
     
 _dependencies = {}
 
-def DeclareDependencies(dependee,dependencies):
+def DeclareDependencies(dependee, dependencies):
     if dependee not in _dependencies:
         _dependencies[dependee] = []
     _dependencies[dependee] += dependencies
@@ -93,18 +93,28 @@ class RenameProperty(Matcher):
             return 'Renamed {0} to {1}'.format(self.old, self.new)
 
 class ChangeType(Matcher):
-    def __init__(self, old, new, forcetype=False):
+    def __init__(self, old, new, forcetype=False, fuzzy=False):
         self.old = old
         self.new = new
         self.forcetype = forcetype
+        self.fuzzy = fuzzy
         
     def Matches(self, atom):
-        if self.old == atom.path:
+        matches = False
+        if self.fuzzy:
+            matches = atom.path.startswith(self.old)
+            if matches:
+                self.new += atom.path[len(self.old):]
+                self.old = atom.path
+                #print('{} -> {}'.format(self.old,self.new))
+        else:
+            matches = self.old == atom.path
+        if matches:
             if atom.missing: 
                 return True
             else:
-                logging.warn('Found type, but marked not missing: {}'.format(atom.path))
-                logging.warn('{}:{}: Target type found here'.format(atom.filename,atom.line))
+                logging.warn('[{}] Found type, but marked not missing: {}'.format(self.__class__.__name__,atom.path))
+                logging.warn('{}:{}: Target type found here'.format(atom.filename, atom.line))
         return False
     
     def Fix(self, atom):
@@ -122,7 +132,7 @@ class FixStepX(RenameProperty):
 @MapFix(None)
 class FixStepY(RenameProperty):
     def __init__(self):
-        RenameProperty.__init__(self, 'step_y', 'pixel_y'), 
+        RenameProperty.__init__(self, 'step_y', 'pixel_y'),
 
 @MapFix(None)
 class RepairDirections(Matcher):
@@ -133,7 +143,7 @@ class RepairDirections(Matcher):
         return 'dir' in atom.properties and 'dir' in atom.mapSpecified and isinstance(atom.properties['dir'], BYONDString)
     
     def Fix(self, atom):
-        atom.setProperty('dir',int(atom.getProperty('dir')))
+        atom.setProperty('dir', int(atom.getProperty('dir')))
         return atom
     
     def __str__(self):

@@ -40,14 +40,17 @@ def renderMap(args):
         kwargs['render_types'] = args.render_types
     if args.outfile:
         outfile = args.outfile
+        if os.path.isdir(outfile):
+            title, _ = os.path.splitext(os.path.basename(args.map))
+            outfile = os.path.join(outfile, '{}.{{z}}.png'.format(title))
     dmm.generateImage(outfile, os.path.dirname(args.project), renderflags, **kwargs)
 
 logging.basicConfig(
-    format='%(asctime)s [%(levelname)-8s]: %(message)s', 
-    datefmt='%m/%d/%Y %I:%M:%S %p', 
-    level=logging.INFO#,
-    #filename='logs/main.log',
-    #filemode='w'
+    format='%(asctime)s [%(levelname)-8s]: %(message)s',
+    datefmt='%m/%d/%Y %I:%M:%S %p',
+    level=logging.INFO  # ,
+    # filename='logs/main.log',
+    # filemode='w'
     )
 opt = argparse.ArgumentParser()
 opt.add_argument('project', metavar="project.dme")
@@ -56,7 +59,7 @@ opt.add_argument('--render-stars', dest='render_stars', default=False, action='s
 opt.add_argument('--render-areas', dest='render_areas', default=False, action='store_true', help="Render area overlays.")
 opt.add_argument('--render-only', dest='render_types', action='append', help="Render ONLY these types.  Can be used multiple times to specify more types.")
 opt.add_argument('--area', dest='area', type=list, nargs='*', default=None, help="Specify an area to restrict rendering to.")
-opt.add_argument('--out', dest='outfile', type=str, default=None, help="What to name the file ({z} will be replaced with z-level)")
+opt.add_argument('-O', '--out', dest='outfile', type=str, default=None, help="What to name the file ({z} will be replaced with z-level)")
 opt.add_argument('--area-list', dest='areas', type=str, default=None, help="A file with area_file.png = /area/path on each line")
 args = opt.parse_args()
 if os.path.isfile(args.project):

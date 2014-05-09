@@ -5,7 +5,7 @@ Created on Sep 21, 2013
 '''
 import os
 
-from .map import Map, Tile
+from .map import Map, Tile, MapRenderFlags
 from .objtree import ObjectTree
 
 def GetFilesFromDME(dmefile='baystation12.dme', ext='.dm'):

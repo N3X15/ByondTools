@@ -2,7 +2,7 @@
 /vg/station-specific fixes.
 '''
 
-from .base import Matcher,MapFix,RenameProperty,DeclareDependencies
+from .base import Matcher,MapFix,RenameProperty,DeclareDependencies,ChangeType
 from byond.basetypes import BYONDString, BYONDValue, Atom, PropertyFlags
 from byond.directions import *
 
@@ -25,6 +25,21 @@ class FixNetwork(Matcher):
     
     def __str__(self):
         return 'Changed network property to list'
+    
+@MapFix('vgstation')
+class NetworkingChangeAtmos(ChangeType):
+    def __init__(self):
+        ChangeType.__init__(self,'/obj/machinery/atmospherics','/obj/machinery/networked/atmos', fuzzy = True)
+    
+@MapFix('vgstation')
+class NetworkingChangePower(ChangeType):
+    def __init__(self):
+        ChangeType.__init__(self,'/obj/machinery/power','/obj/machinery/networked/power', fuzzy = True)
+    
+@MapFix('vgstation')
+class NetworkingChangeFiber(ChangeType):
+    def __init__(self):
+        ChangeType.__init__(self,'/obj/machinery/fiber','/obj/machinery/networked/fiber', fuzzy = True)
     
 
 class FixIDTags(Matcher):
@@ -56,24 +71,24 @@ class FixIDTags(Matcher):
 @MapFix('vgstation')
 class StandardizeManifolds(Matcher):
     STATE_TO_TYPE = {
-        'manifold-b'  :'/obj/machinery/atmospherics/pipe/manifold/supply/visible',
-        'manifold-b-f':'/obj/machinery/atmospherics/pipe/manifold/supply/hidden',
-        'manifold-r'  :'/obj/machinery/atmospherics/pipe/manifold/scrubbers/visible',
-        'manifold-r-f':'/obj/machinery/atmospherics/pipe/manifold/scrubbers/hidden',
-        'manifold-c'  :'/obj/machinery/atmospherics/pipe/manifold/cyan/visible',
-        'manifold-c-f':'/obj/machinery/atmospherics/pipe/manifold/cyan/hidden',
-        'manifold-y'  :'/obj/machinery/atmospherics/pipe/manifold/yellow/visible',
-        'manifold-y-f':'/obj/machinery/atmospherics/pipe/manifold/yellow/hidden',
-        'manifold-g'  :'/obj/machinery/atmospherics/pipe/manifold/filtering/visible',
-        'manifold-g-f':'/obj/machinery/atmospherics/pipe/manifold/filtering/hidden',
-        'manifold'    :'/obj/machinery/atmospherics/pipe/manifold/general/visible',
-        'manifold-f'  :'/obj/machinery/atmospherics/pipe/manifold/general/hidden',
+        'manifold-b'  :'/obj/machinery/networked/atmos/pipe/manifold/supply/visible',
+        'manifold-b-f':'/obj/machinery/networked/atmos/pipe/manifold/supply/hidden',
+        'manifold-r'  :'/obj/machinery/networked/atmos/pipe/manifold/scrubbers/visible',
+        'manifold-r-f':'/obj/machinery/networked/atmos/pipe/manifold/scrubbers/hidden',
+        'manifold-c'  :'/obj/machinery/networked/atmos/pipe/manifold/cyan/visible',
+        'manifold-c-f':'/obj/machinery/networked/atmos/pipe/manifold/cyan/hidden',
+        'manifold-y'  :'/obj/machinery/networked/atmos/pipe/manifold/yellow/visible',
+        'manifold-y-f':'/obj/machinery/networked/atmos/pipe/manifold/yellow/hidden',
+        'manifold-g'  :'/obj/machinery/networked/atmos/pipe/manifold/filtering/visible',
+        'manifold-g-f':'/obj/machinery/networked/atmos/pipe/manifold/filtering/hidden',
+        'manifold'    :'/obj/machinery/networked/atmos/pipe/manifold/general/visible',
+        'manifold-f'  :'/obj/machinery/networked/atmos/pipe/manifold/general/hidden',
     }
     def __init__(self):
         return
         
     def Matches(self, atom):
-        if atom.path == '/obj/machinery/atmospherics/pipe/manifold' and 'icon_state' in atom.mapSpecified:
+        if atom.path == '/obj/machinery/networked/atmos/pipe/manifold' and 'icon_state' in atom.mapSpecified:
             return atom.getProperty('icon_state') in self.STATE_TO_TYPE
         return False
     
@@ -90,9 +105,9 @@ class StandardizeManifolds(Matcher):
 @MapFix('vgstation')
 class StandardizePiping(Matcher):
     TYPE_TRANSLATIONS = {
-        '/obj/machinery/atmospherics/pipe/simple': 'simple',
-        '/obj/machinery/atmospherics/pipe/manifold': 'manifold',
-        '/obj/machinery/atmospherics/pipe/manifold4w': 'manifold4w',
+        '/obj/machinery/networked/atmos/pipe/simple': 'simple',
+        '/obj/machinery/networked/atmos/pipe/manifold': 'manifold',
+        '/obj/machinery/networked/atmos/pipe/manifold4w': 'manifold4w',
     }
     COLOR_CODES = {
         'b':'supply',
@@ -108,17 +123,17 @@ class StandardizePiping(Matcher):
         return
         
     def trans_simple(self, atom):
-        type_tmpl = '/obj/machinery/atmospherics/pipe/simple/{color}/{visibility}'
+        type_tmpl = '/obj/machinery/networked/atmos/pipe/simple/{color}/{visibility}'
         color_code, visible = self.parseIconState(atom.getProperty('icon_state', ''))
         return self.getNewType(type_tmpl, color_code, visible)
         
     def trans_manifold(self, atom):
-        type_tmpl = '/obj/machinery/atmospherics/pipe/manifold/{color}/{visibility}'
+        type_tmpl = '/obj/machinery/networked/atmos/pipe/manifold/{color}/{visibility}'
         color_code, visible = self.parseIconState(atom.getProperty('icon_state', ''))
         return self.getNewType(type_tmpl, color_code, visible)
         
     def trans_manifold4w(self, atom):
-        type_tmpl = '/obj/machinery/atmospherics/pipe/manifold4w/{color}/{visibility}'
+        type_tmpl = '/obj/machinery/networked/atmos/pipe/manifold4w/{color}/{visibility}'
         color_code, visible = self.parseIconState(atom.getProperty('icon_state', ''))
         return self.getNewType(type_tmpl, color_code, visible)
         
@@ -162,27 +177,27 @@ class StandardizePiping(Matcher):
 @MapFix('vgstation')
 class StandardizeInsulatedPipes(Matcher):
     STATE_TO_TYPE = {
-        'intact'  :'/obj/machinery/atmospherics/pipe/simple/insulated/visible',
-        'intact-f':'/obj/machinery/atmospherics/pipe/simple/insulated/hidden'
+        'intact'  :'/obj/machinery/networked/atmos/pipe/simple/insulated/visible',
+        'intact-f':'/obj/machinery/networked/atmos/pipe/simple/insulated/hidden'
     }
     def __init__(self):
         return
         
     def Matches(self, atom):
-        if atom.path == '/obj/machinery/atmospherics/pipe/simple/insulated':
+        if atom.path == '/obj/machinery/networked/atmos/pipe/simple/insulated':
             return True
-        if atom.path.startswith('/obj/machinery/atmospherics/pipe/simple/insulated') and int(atom.getProperty('dir', 0)) in (3, 8, 12):
+        if atom.path.startswith('/obj/machinery/networked/atmos/pipe/simple/insulated') and int(atom.getProperty('dir', 0)) in (3, 8, 12):
             # print(atom.MapSerialize())
             return True
         return False
     
     def Fix(self, atom):
         newtype = atom.path
-        if atom.path == '/obj/machinery/atmospherics/pipe/simple/insulated':
+        if atom.path == '/obj/machinery/networked/atmos/pipe/simple/insulated':
             icon_state = ''
             if 'icon_state' in atom.properties:
                 icon_state = atom.properties['icon_state'].value
-            newtype = self.STATE_TO_TYPE.get(icon_state, '/obj/machinery/atmospherics/pipe/simple/insulated/visible')
+            newtype = self.STATE_TO_TYPE.get(icon_state, '/obj/machinery/networked/atmos/pipe/simple/insulated/visible')
         new_atom = Atom(newtype)
         if 'dir' in atom.mapSpecified:
             # Normalize dir
