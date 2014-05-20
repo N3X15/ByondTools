@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import sys, re
 from byond.basetypes import Proc
 from byond.objtree import ObjectTree

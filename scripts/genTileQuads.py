@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from byond.DMI import DMI,State
 from byond import directions
 import os, sys, shutil

@@ -1,10 +1,11 @@
+#!/usr/bin/env python
 """
 DMI SPLITTER-UPPER THING
 
 Makes merging sprites a hell of a lot easier.
 by N3X15 <nexis@7chan.org>
 
-Requires PIL and apng.py (included)
+Requires PIL
 Written for Python 2.7.
 """
 
@@ -48,8 +49,11 @@ def main():
 	_set_dmi_data.add_argument('file', type=str, help='One side of the difference', metavar='file.dmi')
 	_set_dmi_data.add_argument('metadata', type=str, help='DMI header file', metavar='metadata.txt')
 	
+	_set_dmi_data = command.add_parser('clean', help='Clean up temporary files and *.new.dmi files.')
+	_set_dmi_data.add_argument('basedir', type=str, help='Starting directory', metavar='vgstation/')
+	
 	args = opt.parse_args()
-	print(args)
+	#print(args)
 	if args.MODE == 'compile':
 		make_dmi(args.makefile, args.destination, args)
 	if args.MODE == 'compare':
@@ -64,6 +68,8 @@ def main():
 		get_dmi_data(args.file, args.dest, args)
 	elif args.MODE == 'set-dmi-data':
 		set_dmi_data(args.file, args.metadata, args)
+	elif args.MODE == 'cleanup':
+		cleanup(args.basedir, args)
 	else:
 		print('!!! Error, unknown MODE=%r' % args.MODE)
 
@@ -161,7 +167,7 @@ def compare(theirsfile, minefile, parser, reportstream, **kwargs):
 	if(os.path.isfile(minefile)):
 		try:
 			mineDMI = DMI(minefile)
-			mineDMI.loadMetadata()
+			mineDMI.loadAll()
 			mine = mineDMI.states
 		except SystemError as e:
 			print("!!! Received SystemError in %s, halting: %s" % (mine.filename, traceback.format_exc(e)))
@@ -189,6 +195,30 @@ def compare(theirsfile, minefile, parser, reportstream, **kwargs):
 			if theirs[state].ToString() != mine[state].ToString():
 				o += '\n - {0}: {1}'.format(state, mine[state].ToString())
 				o += '\n + {0}: {1}'.format(state, theirs[state].ToString())
+			else:
+				diff_count=0
+				for i in xrange(len(theirs[state].icons)):
+					theirF = theirs[state].icons[i]
+					myF = theirs[state].icons[i] 
+					
+					theirData = list(theirF.getdata())
+					myData = list(myF.getdata())
+					#diff = []
+					
+					for i in xrange(len(theirData)):
+						dr = theirData[i][0] - myData[i][0]
+						dg = theirData[i][1] - myData[i][1]
+						db = theirData[i][2] - myData[i][2]
+						#diff[idx] = (abs(dr), abs(dg), abs(db))
+						if((dr != 0) or (dg != 0) or (db != 0)):
+							diff_count += 1
+							break
+				if diff_count > 0:
+					o += '\n ! {0}: {1} frames differ'.format(state, diff_count)
+					if new2mine is not None:
+						new2mine.states[state] = theirsDMI.states[state]
+					if new2theirs is not None:
+						new2theirs.states[state] = mineDMI.states[state]
 	if o != '': 
 		reportstream.write('\n--- {0}'.format(theirsfile))
 		reportstream.write('\n+++ {0}'.format(minefile))
@@ -208,6 +238,14 @@ def compare(theirsfile, minefile, parser, reportstream, **kwargs):
 				if os.path.isfile(new2theirsFilename):
 					os.remove(new2theirsFilename)
 					#print('RM {0}'.format(new2theirsFilename))
+					
+def cleanup(subject):
+	print('Cleaning...')
+	for root, _, filenames in os.walk(subject):
+		for filename in fnmatch.filter(filenames, '*.new.dmi'):
+			path = os.path.join(root, filename)
+			print('RM {0}'.format(path))
+			os.remove(path)
 
 def disassemble_all(in_dir, out_dir, parser):
 	print('D_A %s -> %s' % (in_dir, out_dir))

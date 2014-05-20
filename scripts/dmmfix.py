@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 fixMap.py - Apply various fixes to a map. 
 
@@ -28,7 +29,7 @@ from byond.objtree import ObjectTree
 #from byond.basetypes import BYONDString, BYONDValue, Atom, PropertyFlags
 #from byond.directions import *
 
-import mapfixes
+from byond import mapfixes
 
 
 opt = argparse.ArgumentParser()  # version='0.1')

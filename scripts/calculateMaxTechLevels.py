@@ -1,4 +1,4 @@
-
+#!/usr/bin/env python
 """
 Usage:
     $ python calculateMaxTechLevels.py path/to/your.dme .dm

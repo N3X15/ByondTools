@@ -1,10 +1,11 @@
+#!/usr/bin/env python
 import os, argparse, logging
 from byond.objtree import ObjectTree
 from byond.basetypes import Atom
 from byond.map import Map, MapRenderFlags
 """
 Usage:
-    $ python generateMap.py path/to/your/project.dme path/to/your/map.dmm
+    $ python dmmrender.py path/to/your/project.dme path/to/your/map.dmm
 
 generateMap.py - Creates an image of a DMM map.
 

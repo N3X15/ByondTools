@@ -9,7 +9,7 @@ except:
     import pickle
    
 from .basetypes import Atom, Proc, BYONDValue, BYONDString, BYONDFileRef
-from .utils import md5sum
+from .utils import md5sum, get_stdlib
 
 REGEX_TABS = re.compile('^(?P<tabs>[\t\s]*)')
 REGEX_ATOMDEF = re.compile('^(?P<tabs>\t*)(?P<atom>[a-zA-Z0-9_/]+)\\{?\\s*$')
@@ -170,8 +170,7 @@ class ObjectTree:
                 
         ToRead = []
         if not self.LoadedStdLib and kwargs.get('load_stdlib', True):
-            stdlib_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-            stdlib_dir = os.path.join(stdlib_dir, 'stdlib')
+            stdlib_dir = get_stdlib()
             for filename in self.stdlib_files:
                 # self.ProcessFile(os.path.join(stdlib_dir, filename))
                 ToRead += [os.path.join(stdlib_dir, filename)]

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 dmm.py - Collection of map tools.
 
