@@ -193,9 +193,9 @@ def compare(theirsfile, minefile, parser, reportstream, **kwargs):
 				new2theirs.states[state] = mineDMI.states[state]
 		elif inTheirs and inMine:
 			if theirs[state].ToString() != mine[state].ToString():
-				o += '\n - {0}: {1}'.format(state, mine[state].ToString())
-				o += '\n + {0}: {1}'.format(state, theirs[state].ToString())
-			else:
+				o += '\n - {0}: {1}'.format(mine[state].displayName(), mine[state].ToString())
+				o += '\n + {0}: {1}'.format(theirs[state].displayName(), theirs[state].ToString())
+			elif kwargs.get('check_changed',True):
 				diff_count=0
 				for i in xrange(len(theirs[state].icons)):
 					theirF = theirs[state].icons[i]
@@ -214,7 +214,7 @@ def compare(theirsfile, minefile, parser, reportstream, **kwargs):
 							diff_count += 1
 							break
 				if diff_count > 0:
-					o += '\n ! {0}: {1} frames differ'.format(state, diff_count)
+					o += '\n ! {0}: {1} frames differ'.format(theirs[state].displayName(), diff_count)
 					if new2mine is not None:
 						new2mine.states[state] = theirsDMI.states[state]
 					if new2theirs is not None:

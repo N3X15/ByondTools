@@ -2,7 +2,9 @@ from byond import directions
 from PIL import Image
 import logging
 
-class State:    
+class State:
+    # So we don't overwrite the static state.
+    MovementTag = 'M'
     def __init__(self, nm):
         self.name = nm
         self.hotspot = ''
@@ -14,6 +16,16 @@ class State:
         self.delay = []
         self.icons = []
         self.positions = []
+        
+    @staticmethod
+    def MakeKey(name,movement=False):
+        key = name
+        tags = ''
+        if movement:
+            tags += State.MovementTag
+        if tags != '':
+            key += '\t' + tags
+        return key
         
     def genManifest(self):
         '''
@@ -32,6 +44,15 @@ state = "void"
         o += self.genManifestLine('delay', self.delay, [])
         
         return o
+    
+    # Mostly for movement states.
+    def displayName(self):
+        tags=[]
+        if self.movement:
+            tags += self.MovementTag
+        if len(tags)>0:
+            return '{} ({})'.format(self.name,', '.join(tags))
+        return self.name
     
     def genDMIH(self):
         o = '\r\nstate "%s" {' % self.name
@@ -58,6 +79,9 @@ state = "void"
         o += '\n\t}'
         o += "\n}"
         return o
+    
+    def key(self):
+        return State.MakeKey(self.name, movement=self.movement==1)
         
     def genDMIHLine(self, name, value, default):
         if value != default:
@@ -82,7 +106,7 @@ state = "void"
     def numIcons(self):
         return self.frames * self.dirs
     
-    def getFrameIndex(self,direction,frame):
+    def getFrameIndex(self, direction, frame):
         _dir = 0
         if self.dirs == 4 or self.dirs == 8:
             _dir = directions.IMAGE_INDICES.index(direction)
@@ -97,21 +121,21 @@ state = "void"
     def getFrame(self, direction, frame):
         return self.icons[self.getFrameIndex(direction, frame)]
     
-    def setFrame(self, direction, frame,img):
+    def setFrame(self, direction, frame, img):
         fi = self.getFrameIndex(direction, frame)
         if len(self.icons) < fi:
-            shouldBeSize=1
+            shouldBeSize = 1
             if fi > 7:
                 logging.error('Unable to set frame: State uninitialized with that many frames.')
                 return
             elif fi > 3:
-                shouldBeSize=8
+                shouldBeSize = 8
             elif fi > 0:
-                shouldBeSize=4
+                shouldBeSize = 4
             while len(self.icons) < shouldBeSize:
-                self.icons.append(Image.new('RGBA',(32,32)))
-            logging.warn('{0} now has {1} frames.'.format(self.name,len(self.icons)))
-        self.icons[fi]=img
+                self.icons.append(Image.new('RGBA', (32, 32)))
+            logging.warn('{0} now has {1} frames.'.format(self.name, len(self.icons)))
+        self.icons[fi] = img
     
     def postProcess(self):
         # So old I forgot what everything did.

@@ -6,7 +6,8 @@ Usage:
     $ cd icons/mob/in-hands
     $ python ss13_makeinhands.py
 
-generateMap.py - Creates an image of a DMM map.
+ss13_makeinhands.py - Generates a large DMI from several smaller DMIs.
+    Specifically used for making icons/mob/items_(left|right)hand.dmi
 
 Copyright 2013 Rob "N3X15" Nelson <nexis@7chan.org>
 
@@ -59,7 +60,7 @@ def buildDMI(directory, output):
                 changes = 0
                 for state_name in subdmi.states:
                     if state_name in dmi.states:
-                        logging.warn('Skipping state {0}:{1} - State exists.'.format(filepath, state_name))
+                        logging.warn('Skipping state {0}:{1} - State exists.'.format(filepath, subdmi.states[state_name].displayName()))
                         continue
                     dmi.states[state_name] = subdmi.states[state_name]
                     changes += 1

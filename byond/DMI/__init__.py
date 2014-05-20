@@ -12,6 +12,7 @@ class DMILoadFlags:
     
 
 class DMI:
+    MovementTag = '\t'
     def __init__(self, filename):
         self.filename = filename
         self.version = ''
@@ -36,7 +37,7 @@ class DMI:
                 elif node.name == 'weight':
                     self.icon_width = node.value
             elif type(node) is directives.State:
-                self.states[node.state.name] = node.state
+                self.states[node.state.key()] = node.state
             elif type(node) is directives.Import:
                 if node.ftype == 'dmi':
                     dmi = DMI(node.filedef)
@@ -71,7 +72,7 @@ class DMI:
                 # frames += self.states[name].icons
                 # frames.extend(self.states[name].icons)
                 for i in range(len(self.states[name].icons)):
-                    fdata += ['{}[{}]'.format(name, i)]
+                    fdata += ['{}[{}]'.format(self.states[name].name, i)]
                     frames += [self.states[name].icons[i]]
             else:
                 logging.warn('State {0} has 0 icons.'.format(name))
@@ -150,12 +151,14 @@ class DMI:
         # print('>>> Extracting %s...' % self.filename)
         self.extractAllStates(dest, flags)
     
-    def getFrame(self, state, direction, frame):
+    def getFrame(self, state, direction, frame, movement=False):
+        state = State.MakeKey(state,movement=movement)
         if state not in self.states:
             return None
         return self.states[state].getFrame(direction, frame)
     
-    def setFrame(self, state, direction, frame, img):
+    def setFrame(self, state, direction, frame, img, movement=False):
+        state = State.MakeKey(state,movement=movement)
         if state not in self.states:
             self.states[state] = State(state)
         return self.states[state].setFrame(direction, frame, img)
@@ -282,7 +285,7 @@ state = "void2"
                             if(x >= self.max_x):
                                 x = 0
                                 y += 1
-                        self.states[state.name] = state
+                        self.states[state.key()] = state
                         # if not suppress_post_process:
                         #    self.states[state.name].postProcess()
                         ii += 1
@@ -302,7 +305,7 @@ state = "void2"
                 elif key == 'hotspot':
                     state.hotspot = value
                 else:
-                    logging.warn('Unknown key ' + key + ' (value=' + value + ')!')
+                    logging.critical('Unknown key ' + key + ' (value=' + value + ')!')
                     sys.exit()
         
         self.states[state.name] = state
