@@ -5,15 +5,14 @@
 #------------------------------------------------------------------------------
 
 import distutils.sysconfig
-import glob
-import os
+import glob, os, sys
 
 vars = distutils.sysconfig.get_config_vars()
 prefix = vars["prefix"]
-python = os.path.join(prefix, "python.exe")
+python = sys.executable #os.path.join(prefix, "python.exe")
 scriptDir = os.path.join(prefix, "Scripts")
 
-# Keep in-sync with setup.py.
+# Keep in sync with setup.py.
 scripts = [
     'dmm',
     'dmi',
@@ -21,12 +20,17 @@ scripts = [
     'dmmrender',
     'dmmfix',
     
-    'ss13_makeinhands'
+    #TODO: Combine into dmi.
+    'ss13_makeinhands',
+    
+    # Our post-install.  Now run on Linux, as well.
+    "byondtools-postinstall"
 ]
+
 for fileName in glob.glob(os.path.join(scriptDir, "*.py")):
     # skip already created batch files if they exist
     name, ext = os.path.splitext(os.path.basename(fileName))
-    if name not in scripts:
+    if name not in scripts or name == 'byondtools-postinstall':
         continue
 
     print('Running post-install for {}.'.format(name))
@@ -36,15 +40,19 @@ for fileName in glob.glob(os.path.join(scriptDir, "*.py")):
     lines = open(fullName).readlines()
     startidx=1
     if not lines[0].strip().startswith('#!'):
-        print('WARNING: {} does not have a shebang.'.format(lines[0]))
+        print('WARNING: {} does not have a shebang.'.format(name))
         startidx=0
-    outFile = open(fullName, "w")
-    outFile.write("#!%s\n" % python)
-    outFile.writelines(lines[startidx:])
-    outFile.close()
+    
+    targetFile = strippedName
+    if sys.platform == 'win32':
+        targetFile = fullName
+    with open(targetFile, "w") as outFile:
+        outFile.write("#!{}\n".format(python)) # Not sure why this is done on Windows...
+        outFile.writelines(lines[startidx:])
 
-    # create the batch file
-    batchFileName = strippedName + ".bat"
-    command = "%s %s %%*" % (python, fullName)
-    open(batchFileName, "w").write("@echo off\n\n%s" % command)
+    if sys.platform == 'win32':
+        # create the batch file
+        batchFileName = strippedName + ".bat"
+        command = "{} {} %*".format(python, targetFile)
+        open(batchFileName, "w").write("@echo off\n\n{}".format(command))
 

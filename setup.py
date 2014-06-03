@@ -1,6 +1,6 @@
 
-import glob, os, sys
-from setuptools import setup
+import os, sys
+from setuptools import setup, find_packages
 from setuptools.command.install import install as _install
 
 scripts = [
@@ -10,13 +10,23 @@ scripts = [
     'dmmrender',
     'dmmfix',
     
-    'ss13_makeinhands'
+    #TODO: Combine into dmi.
+    'ss13_makeinhands',
+    
+    # Our post-install.  Now run on Linux, as well.
+    "byondtools-postinstall"
 ]
 
-def _post_install(dir):
+def _post_install(_dir):
+    '''Run our fancy post-install thing that builds batch files for windows.'''
     from subprocess import call
-    print('dir={}'.format(dir))
-    call([sys.executable, 'byondtools-postinstall.py'], cwd=dir)
+    #print('_dir={}'.format(_dir))
+    call([sys.executable, 'byondtools-postinstall.py'], cwd=_dir)
+
+def read(*paths):
+    """Build a file path from *paths* and return the contents."""
+    with open(os.path.join(*paths), 'r') as f:
+        return f.read()
 
 
 class install(_install):
@@ -26,18 +36,16 @@ class install(_install):
         self.execute(_post_install, (self.install_scripts,),  msg="Running post install task")
 
 options = {}
-if sys.platform == "win32":
-    scripts.append("byondtools-postinstall")
 scripts = ['scripts/{}.py'.format(x) for x in scripts]
     
 setup(name='BYONDTools',
-    version='0.1.0',
+    version='0.1.1',
     description='Tools and interfaces for interacting with the BYOND game engine.',
     url='http://github.com/N3X15/BYONDTools',
     author='N3X15',
     author_email='nexisentertainment@gmail.com',
     license='MIT',
-    packages=['byond'],
+    packages=find_packages(exclude=['tests*']),
     install_requires=[
         'Pillow'
     ],
@@ -45,4 +53,5 @@ setup(name='BYONDTools',
     test_suite='tests',
     scripts=scripts,
     zip_safe=False,
-    cmdclass={'install': install})
+    cmdclass={'install': install}
+)

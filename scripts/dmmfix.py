@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-fixMap.py - Apply various fixes to a map. 
+dmmfix.py - Apply various fixes to a map. 
 
 Copyright 2013 Rob "N3X15" Nelson <nexis@7chan.org>
 
