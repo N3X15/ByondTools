@@ -1,6 +1,6 @@
-================
-0.1.1 - 6/2/2014
-================
+=================
+0.1.1b - 6/2/2014
+=================
 
 * Fixed some leftover packaging issues:
 
@@ -10,3 +10,4 @@
 * Post-install process now uses sys.executable, rather than trying to figure it out via hackier means.
 * README changed to reStructuredText for eventual pip release.
 * Oh my god there's a changelog now
+* Added MANIFEST.in (fixed a problem uploading *.rst files).
