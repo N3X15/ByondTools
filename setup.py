@@ -41,6 +41,9 @@ scripts = ['scripts/{}.py'.format(x) for x in scripts]
 setup(name='BYONDTools',
     version='0.1.1',
     description='Tools and interfaces for interacting with the BYOND game engine.',
+    long_description = (read('README.rst') + '\n\n' +
+                        read('CHANGELOG.rst')),# + '\n\n' +
+                        #read('AUTHORS.rst'))
     url='http://github.com/N3X15/BYONDTools',
     author='N3X15',
     author_email='nexisentertainment@gmail.com',
