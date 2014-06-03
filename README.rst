@@ -1,6 +1,6 @@
-=========
-OpenByond
-=========
+==========
+BYONDTools
+==========
 
 A set of tools for BYOND-based games.
 
