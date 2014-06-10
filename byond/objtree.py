@@ -583,9 +583,13 @@ class ObjectTree:
             line = decl = self.lineBeforePreprocessing.strip()
         else:
             decl = line.strip()
-        if '[' in line:
+        if '[' in line and not 'list(' in line:
             line_split, arr_decl = line.split('[', 1)
-            str_size = arr_decl[:arr_decl.index(']')]
+            try:
+                str_size = arr_decl[:arr_decl.index(']')]
+            except ValueError:
+                logging.warn('{}:{}: MALFORMED CODE: Unable to find ]'.format(filename,ln))
+                logging.info(line)
             size = -1
             if str_size != '':
                 try:

@@ -1,4 +1,11 @@
 =================
+0.1.1c - 6/10/2014
+=================
+
+* Missed data directory.  Whoops.
+* Object tree: Fixed mishandling of list() in variables when [ is on the same line.
+
+=================
 0.1.1b - 6/2/2014
 =================
 

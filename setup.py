@@ -39,7 +39,7 @@ options = {}
 scripts = ['scripts/{}.py'.format(x) for x in scripts]
     
 setup(name='BYONDTools',
-    version='0.1.1b',
+    version='0.1.1c',
     description='Tools and interfaces for interacting with the BYOND game engine.',
     long_description = (read('README.rst') + '\n\n' +
                         read('CHANGELOG.rst')),# + '\n\n' +
@@ -49,6 +49,7 @@ setup(name='BYONDTools',
     author_email='nexisentertainment@gmail.com',
     license='MIT',
     packages=find_packages(exclude=['tests*']),
+    package_data = {'byond' : ['data/stdlib/*'] },
     install_requires=[
         'Pillow'
     ],

@@ -1,1 +1,2 @@
-include *.rst
+include *.rst 
+recursive-include byond/data *.dm
