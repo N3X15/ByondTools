@@ -1,4 +1,11 @@
 =================
+0.1.2 - 6/17/2014
+=================
+
+* Fixed line-ending stupidity on Linux
+* Fixed python trying to interpret DME-derived paths literally (mostly path seperator stuff)
+
+=================
 0.1.1c - 6/10/2014
 =================
 

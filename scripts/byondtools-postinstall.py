@@ -48,7 +48,8 @@ for fileName in glob.glob(os.path.join(scriptDir, "*.py")):
         targetFile = fullName
     with open(targetFile, "w") as outFile:
         outFile.write("#!{}\n".format(python)) # Not sure why this is done on Windows...
-        outFile.writelines(lines[startidx:])
+        for line in lines[startidx:]:
+            outFile.write(line.rstrip('\r\n \t')+"\n") # Shit happens on Linux if this isn't done.
 
     if sys.platform == 'win32':
         # create the batch file

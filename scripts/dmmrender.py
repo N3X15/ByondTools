@@ -1,9 +1,6 @@
 #!/usr/bin/env python
-import os, argparse, logging
-from byond.objtree import ObjectTree
-from byond.basetypes import Atom
-from byond.map import Map, MapRenderFlags
 """
+
 Usage:
     $ python dmmrender.py path/to/your/project.dme path/to/your/map.dmm
 
@@ -30,6 +27,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 """
+import os, argparse, logging
+from byond.objtree import ObjectTree
+from byond.basetypes import Atom
+from byond.map import Map, MapRenderFlags
                 
 def renderMap(args):
     outfile = args.map + '.{z}.png'
