@@ -20,7 +20,7 @@ scripts = [
 def _post_install(_dir):
     '''Run our fancy post-install thing that builds batch files for windows.'''
     from subprocess import call
-    #print('_dir={}'.format(_dir))
+    print('_dir={}'.format(_dir))
     call([sys.executable, 'byondtools-postinstall.py'], cwd=_dir)
 
 def read(*paths):
@@ -39,7 +39,7 @@ options = {}
 scripts = ['scripts/{}.py'.format(x) for x in scripts]
     
 setup(name='BYONDTools',
-    version='0.1.2',
+    version='0.1.3',
     description='Tools and interfaces for interacting with the BYOND game engine.',
     long_description = (read('README.rst') + '\n\n' +
                         read('CHANGELOG.rst')),# + '\n\n' +

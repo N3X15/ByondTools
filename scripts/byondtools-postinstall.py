@@ -10,7 +10,15 @@ import glob, os, sys
 vars = distutils.sysconfig.get_config_vars()
 prefix = vars["prefix"]
 python = sys.executable #os.path.join(prefix, "python.exe")
-scriptDir = os.path.join(prefix, "Scripts")
+
+scriptDir = ''
+# Almost verbatim from Pip's sourcecode.
+if sys.platform == 'win32':
+    scriptDir = os.path.join(sys.prefix, 'Scripts')
+else:
+    # This is different because it's just plain wrong on Debian.
+    #scriptDir = os.path.join(sys.prefix, 'bin')
+    scriptDir = os.path.curdir
 
 # Keep in sync with setup.py.
 scripts = [
@@ -26,7 +34,7 @@ scripts = [
     # Our post-install.  Now run on Linux, as well.
     "byondtools-postinstall"
 ]
-
+print(" Checking {} for things to fix...".format(scriptDir))
 for fileName in glob.glob(os.path.join(scriptDir, "*.py")):
     # skip already created batch files if they exist
     name, ext = os.path.splitext(os.path.basename(fileName))
@@ -56,4 +64,6 @@ for fileName in glob.glob(os.path.join(scriptDir, "*.py")):
         batchFileName = strippedName + ".bat"
         command = "{} {} %*".format(python, targetFile)
         open(batchFileName, "w").write("@echo off\n\n{}".format(command))
-
+    else:
+        os.chmod(strippedName, 0755)
+        print('CHMOD 755 {}'.format(strippedName))
