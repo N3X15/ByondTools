@@ -141,7 +141,7 @@ def ProcessFilesFromDME(dmefile='baystation12.dme', ext='.dm'):
                         if c == '"':
                             inString = not inString
                             if not inString:
-                                filepath = os.path.join(rootdir, filename)
+                                filepath = os.path.join(rootdir, filename.replace('\\',os.sep))
                                 if filepath.endswith(ext):
                                     # print('Processing {0}...'.format(filepath))
                                     fileFuckups[filepath] = ProcessFile(filepath)

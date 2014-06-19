@@ -193,7 +193,7 @@ class ObjectTree:
                         if c == '"':
                             inString = not inString
                             if not inString:
-                                filepath = os.path.join(rootdir, filename)
+                                filepath = os.path.join(rootdir, filename.replace('\\',os.sep))
                                 if filepath.endswith(ext):
                                     ToRead += [filepath]
                                 filename = ''
