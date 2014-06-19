@@ -10,6 +10,47 @@ OBJ_LAYER = 3
 MOB_LAYER = 4
 FLY_LAYER = 5
 
+# @formatter:off
+COLORS = {
+    'aqua':    '#00FFFF',
+    'black':   '#000000',
+    'blue':    '#0000FF',
+    'brown':   '#A52A2A',
+    'cyan':    '#00FFFF',
+    'fuchsia': '#FF00FF',
+    'gold':    '#FFD700',
+    'gray':    '#808080',
+    'green':   '#008000',
+    'grey':    '#808080',
+    'lime':    '#00FF00',
+    'magenta': '#FF00FF',
+    'maroon':  '#800000',
+    'navy':    '#000080',
+    'olive':   '#808000',
+    'purple':  '#800080',
+    'red':     '#FF0000',
+    'silver':  '#C0C0C0',
+    'teal':    '#008080',
+    'white':   '#FFFFFF',
+    'yellow':  '#FFFF00'
+}
+# @formatter:on
+
+_COLOR_LOOKUP = {}
+    
+def BYOND2RGBA(colorstring, alpha=255):
+    colorstring = colorstring.strip()
+    if colorstring[0] == '#': 
+        colorstring = colorstring[1:]
+        r, g, b = colorstring[:2], colorstring[2:4], colorstring[4:]
+        r, g, b = [int(n, 16) for n in (r, g, b)]
+        return (r, g, b, alpha)
+    else:
+        return _COLOR_LOOKUP[colorstring]
+    
+for name, color in COLORS.items():
+    _COLOR_LOOKUP[name] = BYOND2RGBA(color)
+    
 import re
 from .utils import eval_expr
 REGEX_TABS = re.compile('^(?P<tabs>\t*)') 
@@ -165,12 +206,12 @@ class Atom:
         self.old_id = None
         
         #: Used internally.
-        self.ob_inherited=False
+        self.ob_inherited = False
         
         #: Loaded from map, but missing in the code. (Maps only)
-        self.missing=kwargs.get('missing',False)
+        self.missing = kwargs.get('missing', False)
         
-        #if not self.missing and path == '/area/engine/engineering':
+        # if not self.missing and path == '/area/engine/engineering':
         #    raise Exception('God damnit')
     def copy(self):
         '''
@@ -178,7 +219,7 @@ class Atom:
         
         :returns byond.basetypes.Atom
         '''
-        new_node = Atom(self.path,self.filename,self.line,missing=self.missing)
+        new_node = Atom(self.path, self.filename, self.line, missing=self.missing)
         new_node.properties = self.properties.copy()
         new_node.mapSpecified = self.mapSpecified
         new_node.id = self.id
@@ -253,7 +294,7 @@ class Atom:
 
     def InheritProperties(self):
         if self.ob_inherited: return
-        #debugInheritance=self.path in ('/area','/obj','/mob','/atom/movable','/atom')
+        # debugInheritance=self.path in ('/area','/obj','/mob','/atom/movable','/atom')
         if self.parent:
             if not self.parent.ob_inherited:
                 self.parent.InheritProperties()
@@ -262,9 +303,9 @@ class Atom:
                 if key not in self.properties:
                     self.properties[key] = value
                     self.properties[key].inherited = True
-                    #if debugInheritance:print('  {0}[{2}] -> {1}'.format(self.parent.path,self.path,key))
-        #assert 'name' in self.properties
-        self.ob_inherited=True
+                    # if debugInheritance:print('  {0}[{2}] -> {1}'.format(self.parent.path,self.path,key))
+        # assert 'name' in self.properties
+        self.ob_inherited = True
         for k in self.children.iterkeys():
             self.children[k].InheritProperties()
     
@@ -280,8 +321,8 @@ class Atom:
             return False
         return self.properties == atom.properties
     
-    def handle_math(self,expr):
-        if isinstance(expr,str):
+    def handle_math(self, expr):
+        if isinstance(expr, str):
             return eval_expr(expr)
         return expr
         
@@ -291,12 +332,12 @@ class Atom:
         myLayer = 0
         otherLayer = 0
         try:
-            myLayer = self.handle_math(self.getProperty('layer',myLayer))
+            myLayer = self.handle_math(self.getProperty('layer', myLayer))
         except ValueError:
             print('Failed to parse {0} as float.'.format(self.properties['layer'].value))
             pass
         try:
-            otherLayer = self.handle_math(other.getProperty('layer',otherLayer))
+            otherLayer = self.handle_math(other.getProperty('layer', otherLayer))
         except ValueError:
             print('Failed to parse {0} as float.'.format(other.properties['layer'].value))
             pass
@@ -308,12 +349,12 @@ class Atom:
         myLayer = 0
         otherLayer = 0
         try:
-            myLayer = self.handle_math(self.getProperty('layer',myLayer))
+            myLayer = self.handle_math(self.getProperty('layer', myLayer))
         except ValueError:
             print('Failed to parse {0} as float.'.format(self.properties['layer'].value))
             pass
         try:
-            otherLayer = self.handle_math(other.getProperty('layer',otherLayer))
+            otherLayer = self.handle_math(other.getProperty('layer', otherLayer))
         except ValueError:
             print('Failed to parse {0} as float.'.format(other.properties['layer'].value))
             pass
@@ -391,7 +432,7 @@ class Proc(Atom):
         self.definition = False
         self.origpath = ''
         
-    def figureOutName(self,path):
+    def figureOutName(self, path):
         name = path.split('(')[0]
         return name.split('/')[-1]
         
