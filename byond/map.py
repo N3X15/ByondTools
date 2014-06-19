@@ -1,7 +1,31 @@
+"""
+Map Interface Module
+
+Copyright 2013 Rob "N3X15" Nelson <nexis@7chan.org>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+"""
 import os, itertools, sys
 from byond.DMI import DMI
 from byond.directions import SOUTH, IMAGE_INDICES
-from byond.basetypes import Atom, BYONDString, BYONDValue, BYONDFileRef
+from byond.basetypes import Atom, BYONDString, BYONDValue, BYONDFileRef, BYOND2RGBA
 # from byond.objtree import ObjectTree
 from PIL import Image, ImageChops
 import logging
@@ -40,15 +64,6 @@ def trim(im):
 def tint_image(image, tint_color):
     return ImageChops.multiply(image, Image.new('RGBA', image.size, tint_color))
 
-def BYOND2RGBA(colorstring, alpha=255):
-    colorstring = colorstring.strip()
-    if colorstring[0] == '#': colorstring = colorstring[1:]
-    if len(colorstring) != 6:
-        raise ValueError("input #%s is not in #RRGGBB format" % colorstring)
-    r, g, b = colorstring[:2], colorstring[2:4], colorstring[4:]
-    r, g, b = [int(n, 16) for n in (r, g, b)]
-    return (r, g, b, alpha)
-
 class Tile:
     FLAG_USE_OLD_ID = 1
     FLAG_INHERITED_PROPERTIES = 2
@@ -62,6 +77,28 @@ class Tile:
         self.areaSelected = True
         self.log = logging.getLogger(__name__ + '.Tile')
         self.map = _map
+        
+    def RemoveAtom(self, atom):
+        '''
+        :param Atom atom:
+            Atom to remove.  Raises ValueError if not found.
+        '''
+        self.instances.remove(atom.id)
+        
+    def AppendAtom(self, atom):
+        '''
+        :param Atom atom:
+            Atom to add.
+        '''
+        self.instances.append(atom.id)
+        
+    def CountAtom(self, atom):
+        '''
+        :param Atom atom:
+            Atom to count.
+        :return int: Count of atoms
+        '''
+        return self.instances.count(atom.id)
     
     def ID2String(self, pad=0):
         o = ''
@@ -415,6 +452,9 @@ class Map:
                 
             
     def GetTileAt(self, x, y, z):
+        '''
+        @rtype: Tile
+        '''
         if z < len(self.zLevels):
             return self.zLevels[z].GetTileAt(x, y)
         
@@ -589,6 +629,9 @@ class Map:
         #    logging.info('Icon found for #{}.'.format(atom.id))
         
         dmi_file = atom.properties['icon'].value
+        
+        if dmi_file is None:
+            return None
         
         # Grab default icon_state ('') if we can't find the one defined.
         state = atom.getProperty('icon_state', '')
@@ -843,6 +886,17 @@ class Map:
                 self.log.info('-- {} tiles loaded, {} duplicates discarded'.format(index, self.duplicates))
                 return 
     
+    def AtomChunk2ID(self, chunk):
+        '''
+        :param str chunk:
+            Serialized atom data to find.
+        :return int:
+            Instance ID.
+        '''
+        if chunk in self.atomCache:
+            return self.atomCache[chunk]
+        return None
+            
     def consumeTile(self, line, lineNumber):
         t = Tile(self)
         t.origID = self.consumeTileID(line)
@@ -857,10 +911,16 @@ class Map:
         
         t.instances = self.consumeTileAtoms(tileChunk, lineNumber)
         return t
-    def getTileTypeID(self, t):
+    def getInstanceID(self, atom):
         for tile in self.tileTypes:
-            if tile == t:
+            if tile == atom:
                 return tile.ID
+        return None
+    
+    def SerializedToTypeID(self, serdata):
+        for instance in self.instances:
+            if instance.MapSerialize() == serdata:
+                return instance.id
         return None
     
     def consumeTileID(self, line):
@@ -1053,6 +1113,8 @@ class Map:
                 data = BYONDString(value[1:-1], self.filename, lineNumber)
             elif quote == "'":
                 data = BYONDFileRef(value[1:-1], self.filename, lineNumber)
+        elif value == 'null':
+            data = BYONDValue(None, self.filename, lineNumber)
         else:
             data = BYONDValue(value, self.filename, lineNumber)
         return data

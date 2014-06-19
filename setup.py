@@ -20,7 +20,7 @@ scripts = [
 def _post_install(_dir):
     '''Run our fancy post-install thing that builds batch files for windows.'''
     from subprocess import call
-    print('_dir={}'.format(_dir))
+    #print('_dir={}'.format(_dir))
     call([sys.executable, 'byondtools-postinstall.py'], cwd=_dir)
 
 def read(*paths):
@@ -51,7 +51,8 @@ setup(name='BYONDTools',
     packages=find_packages(exclude=['tests*']),
     package_data = {'byond' : ['data/stdlib/*'] },
     install_requires=[
-        'Pillow'
+        'Pillow',
+        'pyparsing'
     ],
     tests_require=['unittest-xml-reporting'],
     test_suite='tests',

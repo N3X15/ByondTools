@@ -1,4 +1,12 @@
 =================
+0.1.4 - 6/18/2014
+=================
+
+* Added dmm diff and patch commands for patching maps.
+* Added color name support to BYOND2RGBA.  Should fix rendering maps on TG/NT/Bay.
+* Proper handling of nulls.
+
+=================
 0.1.3 - 6/17/2014
 =================
 

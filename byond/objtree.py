@@ -22,7 +22,7 @@ def debug(filename, line, path, message):
     
 class OTRCache:
     # : Only used for obliterating outdated data.
-    VERSION = [28, 4, 2014]
+    VERSION = [18, 6, 2014]
     
     def __init__(self, filename):
         self.filename = filename
@@ -93,13 +93,13 @@ class ObjectTree:
         'atom_defaults.dm'
     )
     def __init__(self, **options):
-        #: All atoms, in a list.
+        # : All atoms, in a list.
         self.Atoms = {}
         
-        #: All atoms, in a tree-node structure.
+        # : All atoms, in a tree-node structure.
         self.Tree = Atom('')
         
-        #: Skip loading from .OTR?
+        # : Skip loading from .OTR?
         self.skip_otr = False
         
         self.LoadedStdLib = False
@@ -588,7 +588,7 @@ class ObjectTree:
             try:
                 str_size = arr_decl[:arr_decl.index(']')]
             except ValueError:
-                logging.warn('{}:{}: MALFORMED CODE: Unable to find ]'.format(filename,ln))
+                logging.warn('{}:{}: MALFORMED CODE: Unable to find ]'.format(filename, ln))
                 logging.info(line)
             size = -1
             if str_size != '':
@@ -630,6 +630,8 @@ class ObjectTree:
             'size':size
         }
         if typepath != '/':
+            if value == 'null':
+                return (name, BYONDValue(None, filename, ln, typepath, **kwargs))
             return (name, BYONDValue(value, filename, ln, typepath, **kwargs))
         elif value and value[0] == '"':
             return (name, BYONDString(value[1:-1], filename, ln, **kwargs))
@@ -640,6 +642,8 @@ class ObjectTree:
                 return (name, BYONDValue(float(value), filename, ln, typepath, **kwargs))
             except ValueError:
                 pass
+        elif value == 'null':
+            return (name, BYONDValue(None, filename, ln, typepath, **kwargs))
         return (name, BYONDValue(value, filename, ln, typepath, **kwargs))
         
     def MakeTree(self):
@@ -666,7 +670,7 @@ class ObjectTree:
                             if '(' in path_item:
                                 cNode.children[path_item] = Proc('/'.join([''] + cpath), [])
                             else:
-                                cNode.children[path_item] = Atom('/'.join([''] + cpath),atom.filename,atom.line)
+                                cNode.children[path_item] = Atom('/'.join([''] + cpath), atom.filename, atom.line)
                         cNode.children[path_item].parent = cNode
                         parent_type = cNode.children[path_item].getProperty('parent_type')
                         if parent_type is not None:

@@ -16,13 +16,13 @@ Requirements
 ------------
 
 * Python 2.7+
-* Python Imaging Library (PIL)
+* Pillow (fork of PIL)
 * numpy
 
 Use
 ---
 
-Each script has documentation in its code at the top of each file.
+Initial documentation is taking shape at http://ss13.nexisonline.net/wiki/User:N3X15/Guide_to_BYONDTools
 
 Support
 -------
