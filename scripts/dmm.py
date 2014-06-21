@@ -41,6 +41,7 @@ def main():
     
     _patch = command.add_parser('patch', help='Apply a map patch.')
     _patch.add_argument('-O', '--output', dest='output', type=str, help='Where to place the patched map. (Default is to overwrite input map)', metavar='mine.dmdiff', nargs='?')
+    _patch.add_argument('--clobber', dest='clobber', action="store_true", help='Overwrite conflicts')
     _patch.add_argument('patch', type=str, help='Patch to apply.', metavar='patch.dmmpatch')
     _patch.add_argument('map', type=str, help='The map to change.', metavar='map.dmm')
     
@@ -69,7 +70,9 @@ def patch_dmm(args):
         sys.exit(1)
         
     dmm = Map(forgiving_atom_lookups=True)
-    dmm.Load(args.map,format='dmm')
+    dmm.Load(args.map, format='dmm')
+    
+    fmt = DMMFormat(dmm)
 
     context = None
     added = 0
@@ -80,10 +83,11 @@ def patch_dmm(args):
             x, y, z = context
             print(' Z={} +{} -{}'.format(z, added, removed))
     
-    REG_INSTRUCTION = re.compile(r'^(?P<change>[\+\-])(?P<amount>[0-9]+)?\s+(?P<atom>/.*)')
+    REG_INSTRUCTION = re.compile(r'^(?P<change>[\+\-])(?P<amount>[0-9\*]+)?\s+(?P<atom>/.*)')
     with open(args.patch) as f:
         ln = 0
         lz = -1
+        skip_block = False
         for line in f:
             ln += 1
             line = line.strip()
@@ -99,16 +103,47 @@ def patch_dmm(args):
                     lz = context[2]
                     added = removed = 0
                 context = newcoords
+                skip_block = False
                 continue
-            if line.startswith('+') or line.startswith('-'):
+            if line.startswith('@') and not skip_block:
+                # @CHECK before-hash after-hash atoms-block
+
+                x, y, z = context
+                
+                if line.startswith('@CHECK'):
+                    _, beforehash, afterhash, serdata = line.split(' ', 3)
+                    
+                    if args.clobber:
+                        print('WARNING: <{},{},{}> has changed and will be overwritten. (--clobber)'.format(x, y, z))
+                        dmm.SetTileAt(x, y, z, fmt.consumeTileChunk(serdata, cache=False))
+                        skip_block = True
+                        continue
+                    curhash = dmm.GetTileAt(x, y, z).GetHash()
+                    if afterhash == curhash:
+                        print('Skipping <{},{},{}> (already what we expected)'.format(x, y, z))
+                        skip_block = True
+                        continue
+                    #else: print('PRE {} != {}: OK'.format(curhash,afterhash))
+                    if beforehash != curhash:
+                        print('WARNING: <{},{},{}> has changed.  Operations on this tile may not be accurate!'.format(x, y, z))
+                        continue
+                    #else: print('OLD {} == {}: OK'.format(curhash,beforehash))
+                          
+            if not skip_block and (line.startswith('+') or line.startswith('-')):
+                if line == '-ALL':
+                    dmm.SetTileAt(x, y, z, dmm.CreateTile())
+                    continue
                 m = REG_INSTRUCTION.match(line)
                 if m is None:
-                    print('MALFORMED INSTRUCTION ON LINE {}: {}'.format(ln, line))
+                    print('{}:{}: MALFORMED INSTRUCTION: {}'.format(args.patch, ln, line))
                     sys.exit(1)
-                amount = int(m.group('amount') or 1)
+                amount = m.group('amount')
+                if amount == '*':
+                    amount = 9999
+                else:
+                    amount = int(m.group('amount') or 1)
                 change = m.group('change')
                 
-                fmt = DMMFormat(dmm)
                 atom = fmt.consumeAtom(m.group('atom'), ln)
                 atom.filename = args.patch
                 atom.line = ln
@@ -117,7 +152,7 @@ def patch_dmm(args):
                     continue
 
                 x, y, z = context
-                if x==0 and y==0 and z ==0:
+                if x == 0 and y == 0 and z == 0:
                     print('WE AT <0,0,0> SOMEFIN WRONG')
                     
                 if z >= len(dmm.zLevels): continue
@@ -128,13 +163,14 @@ def patch_dmm(args):
                         if tile.CountAtom(atom) > 0:
                             tile.RemoveAtom(atom, hash=False)
                             removed += 1
+                        else: break
                 elif change == '+':
                     for _ in range(amount):
                         tile.AppendAtom(atom, hash=False)
                     added += amount
                 tile.UpdateHash()
-                #dmm.SetTileAt(x, y, z, tile)
-                #print('{} - {}'.format((x,y,z),tile))
+                # dmm.SetTileAt(x, y, z, tile)
+                # print('{} - {}'.format((x,y,z),tile))
         printReport(context, added, removed)
     
     print('Saving...')
@@ -163,6 +199,7 @@ def compare_dmm(args):
     format = DMMFormat(None)
     
     output = '{} - {}.dmmpatch'.format(ttitle, mtitle)
+    
     if args.output:
         output = args.output
     with open(output, 'w') as f:
@@ -173,7 +210,6 @@ def compare_dmm(args):
             'atoms':0
         }
         print('Comparing maps...')
-        print('len(theirs_dmm.zLevels) = {}'.format(len(theirs_dmm.zLevels)))
         for z in xrange(len(theirs_dmm.zLevels)):
             t_zlev = theirs_dmm.zLevels[z]
             m_zlev = mine_dmm.zLevels[z]
@@ -212,6 +248,10 @@ def compare_dmm(args):
                             if key not in mine:
                                 mine[key] = [A, 0]
                             mine[key][1] += 1
+
+                    removals = set()
+                    additions = set()
+                    kept = {}
                     
                     for key in all_keys:
                         change = None
@@ -224,25 +264,44 @@ def compare_dmm(args):
                         delta = minecount - theircount
                         if delta < 0:
                             change = '-'
-                        if delta > 0:
+                            removals.add(key)
+                        elif delta > 0:
                             change = '+'
+                            additions.add(key)
+                        if minecount > 0 and delta <= 0:
+                            kept[key] = minecount
                         if change is not None:
                             CHANGES[key] = [change, abs(delta), minecount, theircount]
                         stats['tiles'] += 1
                     
-                    if len(CHANGES) > 0:
-                        f.write('<{},{},{}>\n'.format(x, y, z))
-                        stats['tilediffs'] += 1
-                        for key, changedat in CHANGES.items():
-                            # change, amount, mc, tc = changedat
-                            change, amount, _, _ = changedat
+                    def writeChanges(f, source, CHANGES):
+                        for key in source:
+                            change, amount, mc, tc = CHANGES[key]
+                            # change, amount, _, _ = changedat
                             # f.write(' # {} vs {}\n'.format(mc, tc))
                             abs_amt = abs(amount)
                             if abs_amt > 1:
-                                f.write(' {}{} {}\n'.format(change, abs_amt, key))
+                                f.write(' {}{} {}\n'.format(change, abs_amt if mc > 0 else '*', key))
                             else:
                                 f.write(' {} {}\n'.format(change, key))
                             stats['diffs'] += abs_amt
+                            
+                    if len(CHANGES) > 0:
+                        f.write('<{},{},{}>\n'.format(x, y, z))
+                        stats['tilediffs'] += 1
+                        f.write(' @CHECK {before} {after} {tiledat}\n'.format(before=tTile.GetHash(), after=mTile.GetHash(), tiledat=format.SerializeTile(mTile)))
+                        if len(kept) == 0:
+                            f.write(' -ALL\n')
+                        else:
+                            writeChanges(f, removals, CHANGES)
+                        """
+                        for key,count in kept.items():
+                            if count > 1:
+                                f.write(' ={} {}\n'.format(count, key))
+                            else:
+                                f.write(' = {}\n'.format(key))
+                        """
+                        writeChanges(f, additions, CHANGES)
         print('Compared maps: {} differences in {} tiles.'.format(stats['diffs'], stats['tilediffs']))
         print('Total: {} atoms, {} tiles.'.format(stats['diffs'], stats['tilediffs']))
 

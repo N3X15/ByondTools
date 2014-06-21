@@ -304,18 +304,24 @@ class DMMFormat(BaseMapFormat):
                         
         return currentAtom
         
-    def consumeTile(self, line, lineNumber):
-        t = self.map.CreateTile()
+    def consumeTile(self, line, lineNumber=0, cache=True):
+        t = self.consumeTileChunk(line, lineNumber, cache)
         t.origID = self.consumeTileID(line)
+        return t
+        
+    def consumeTileChunk(self, line, lineNumber=0, cache=True):
+        t = self.map.CreateTile()
         tileChunk = line.strip()[line.index('(') + 1:-1]
         
-        if tileChunk in self.tileChunk2ID:
-            tid = self.tileChunk2ID[tileChunk]
-            print('{} duplicate of {}! Installing redirect...'.format(t.origID, tid))
-            self.oldID2NewID[t.origID] = tid
-            self.duplicates += 1
-            return self.tileTypes[tid]
-        self.tileChunk2ID[tileChunk]=t.origID
+        if cache: 
+            if tileChunk in self.tileChunk2ID:
+                tid = self.tileChunk2ID[tileChunk]
+                print('{} duplicate of {}! Installing redirect...'.format(t.origID, tid))
+                self.oldID2NewID[t.origID] = tid
+                self.duplicates += 1
+                return self.tileTypes[tid]
+            self.tileChunk2ID[tileChunk] = t.origID
+            
         t.instances = self.consumeTileAtoms(tileChunk, lineNumber)
         return t
     
@@ -399,29 +405,30 @@ class DMMFormat(BaseMapFormat):
         self.dump_inherited = kwargs.get('inherited', False)
         
         # Preprocess and assign IDs.
+        start = clock()
         idlen = 0
         it = self.map.Tiles()
         lz = -1
         last_str = None
         start = None
-        maxid=0
+        maxid = 0
         for tile in it:
-            #print(str(tile))
+            # print(str(tile))
             if lz != it.z:
                 if start:
                     print('  -> Took {}'.format(getElapsed(start)))
-                print(' * Consolidating level {}...'.format(it.z+1))
+                print(' * Consolidating level {}...'.format(it.z + 1))
                 start = clock()
                 lz = it.z
             strt = tile.GetHash()  # str(tile)
             dbg = False
-            #if strt == 'e18826df83665059358c177f43f6ac72':
+            # if strt == 'e18826df83665059358c177f43f6ac72':
             #    dbg=True
             if last_str == strt:
-                #if dbg: print('Continuing: Same as last examined.') 
+                # if dbg: print('Continuing: Same as last examined.') 
                 continue
             if strt in examined:
-                #if dbg: print('Continuing: Hash already examined.')
+                # if dbg: print('Continuing: Hash already examined.')
                 last_str = strt
                 continue
             # tile.ID = len(examined)
@@ -434,28 +441,29 @@ class DMMFormat(BaseMapFormat):
                 tile.origID = ''
                 tid = len(self.typeMap)
                 while tid in self.typeMap:
-                    tid+=1
-                #print('{} assigned to new TID {}'.format(strt,tid))
-            maxid=max(maxid,tid)
-            self.typeMap[tid] = (strt,self.SerializeTile(tile))
+                    tid += 1
+                # print('{} assigned to new TID {}'.format(strt,tid))
+            maxid = max(maxid, tid)
+            self.typeMap[tid] = (strt, self.SerializeTile(tile))
             last_str = strt
-            hashMap[strt]=tid
+            hashMap[strt] = tid
         
-        idlen=len(self.ID2String(maxid))
+        print(' * Preprocessing completed in {}'.format(getElapsed(start)))
+        idlen = len(self.ID2String(maxid))
         tmpfile = filename + '.tmp'
         print('Opening {} for write...'.format(tmpfile))
         start = clock()
         with open(tmpfile, 'w') as f:
             for tid in sorted(self.typeMap.keys()):
-                stid=self.ID2String(tid, idlen)
-                strt,serdata=self.typeMap[tid]
+                stid = self.ID2String(tid, idlen)
+                strt, serdata = self.typeMap[tid]
                 f.write('"{}" = {}\n'.format(stid, serdata))
                 self.type2TID[strt] = stid
             print(' Wrote types in {}...'.format(getElapsed(start)))
             lap = clock()
             for z in xrange(len(self.map.zLevels)):
                 print(' Writing z={}...'.format(z))
-                f.write('\n(1,1,{0}) = {{"\n'.format(z+1))
+                f.write('\n(1,1,{0}) = {{"\n'.format(z + 1))
                 zlevel = self.map.zLevels[z]
                 for y in xrange(zlevel.height):
                     for x in xrange(zlevel.width):
