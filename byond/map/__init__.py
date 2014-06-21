@@ -81,7 +81,7 @@ class TileIterator:
             raise StopIteration
         
         t = self.map.GetTileAt(self.x, self.y, self.z)
-        #print('{} = {}'.format((self.x,self.y,self.z),str(t)))
+        # print('{} = {}'.format((self.x,self.y,self.z),str(t)))
         return t
 
 class Tile(object):
@@ -135,7 +135,8 @@ class Tile(object):
     
     def copy(self, origID=False):
         tile = self.map.CreateTile()
-        tile.instances = self.instances
+        tile.instances = [x for x in self.instances]
+        
         if origID:
             tile.origID = self.origID
         
@@ -304,18 +305,33 @@ vTile = numpy.vectorize(Tile)
 class MapLayer:
     def __init__(self, _map, height=255, width=255):
         self.map = _map
-        self.min = (1, 1)
-        self.max = (height, width)
+        self.min = (0, 0)
+        self.max = (height - 1, width - 1)
+        self.tiles = None
+        self.Resize(height, width)
+        
+        
+    def GetTile(self, x, y):
+        # return self.tiles[y][x]
+        return self.tiles[x, y]
+    
+    def SetTile(self, x, y, tile):
+        # self.tiles[y][x] = tile
+        self.tiles[x, y] = tile
+        
+    def Resize(self, height, width):
         self.height = height
         self.width = width
-        self.tiles = numpy.empty((height, width), object)
         
-        self.tiles[:, :] = vTile(self)
-        
-    def Resize(self,height,width):
-        self.height=height
-        self.width=width
-        self.tiles.resize(height,width)
+        if self.tiles is None:
+            self.tiles = numpy.empty((height, width), object)
+            for y in xrange(height):
+                for x in xrange(width):
+                    self.SetTile(x, y, Tile(self.map))
+        else:
+            self.tiles.resize(height, width)
+                
+        # self.tiles = [[Tile(self.map) for _ in xrange(width)] for _ in xrange(height)]
     
 class MapRenderFlags:
     RENDER_STARS = 1
@@ -346,14 +362,14 @@ class Map:
     
     def Load(self, filename, **kwargs):
         _, ext = os.path.splitext(filename)
-        fmt=kwargs.get('format','dmm2' if ext=='dmm2' else 'dmm')
+        fmt = kwargs.get('format', 'dmm2' if ext == 'dmm2' else 'dmm')
         reader = GetMapFormat(self, fmt)
         reader.Load(filename, **kwargs)
     
     def Save(self, filename, **kwargs):
         _, ext = os.path.splitext(filename)
-        fmt=kwargs.get('format','dmm2' if ext=='dmm2' else 'dmm')
-        reader = GetMapFormat(self, kwargs.get('format',fmt))
+        fmt = kwargs.get('format', 'dmm2' if ext == 'dmm2' else 'dmm')
+        reader = GetMapFormat(self, kwargs.get('format', fmt))
         reader.Save(filename, **kwargs)
         
     def writeMap2(self, filename, flags=0):
@@ -393,7 +409,7 @@ class Map:
         :rtype Tile:
         '''
         if z < len(self.zLevels):
-            return self.zLevels[z].tiles[x, y]
+            return self.zLevels[z].GetTile(x, y)
                 
     def CopyTileAt(self, x, y, z):
         '''
@@ -402,8 +418,7 @@ class Map:
         :param int z:
         :rtype Tile:
         '''
-        if z < len(self.zLevels):
-            return self.zLevels[z].tiles[x, y].copy()
+        self.GetTileAt(x, y, z).copy()
                 
     def SetTileAt(self, x, y, z, tile):
         '''
@@ -412,7 +427,7 @@ class Map:
         :param int z:
         '''
         if z < len(self.zLevels):
-            self.zLevels[z].tiles[x, y] = tile
+            self.zLevels[z].SetTile(x, y, tile)
                 
     def CreateTile(self):
         '''

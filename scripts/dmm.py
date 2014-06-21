@@ -110,6 +110,8 @@ def patch_dmm(args):
                 
                 fmt = DMMFormat(dmm)
                 atom = fmt.consumeAtom(m.group('atom'), ln)
+                atom.filename = args.patch
+                atom.line = ln
                 if atom is None:
                     print('{}:{}: WARNING: Unable to parse instance specified by chunk {}'.format(args.patch, ln, m.group('atom')))
                     continue
@@ -120,7 +122,7 @@ def patch_dmm(args):
                     
                 if z >= len(dmm.zLevels): continue
                 
-                tile = dmm.CopyTileAt(x, y, z)
+                tile = dmm.GetTileAt(x, y, z)
                 if change == '-':
                     for _ in range(amount):
                         if tile.CountAtom(atom) > 0:
@@ -128,13 +130,10 @@ def patch_dmm(args):
                             removed += 1
                 elif change == '+':
                     for _ in range(amount):
-                        #TODO: Fix me
                         tile.AppendAtom(atom, hash=False)
-                        #print(' + {}'.format(atom))
-                        #break
                     added += amount
                 tile.UpdateHash()
-                dmm.SetTileAt(x, y, z, tile)
+                #dmm.SetTileAt(x, y, z, tile)
                 #print('{} - {}'.format((x,y,z),tile))
         printReport(context, added, removed)
     

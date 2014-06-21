@@ -128,7 +128,7 @@ class DMMFormat(BaseMapFormat):
                 for chunk in chunker(line.strip(), self.idlen):
                     chunk = self.String2ID(''.join(chunk))
                     tid = self.oldID2NewID[chunk]
-                    zLevel.tiles[x, y] = self.tileTypes[tid].copy(origID=True)
+                    zLevel.SetTile(x, y, self.tileTypes[tid].copy(origID=True))
                     x += 1
                 y += 1
                 
@@ -317,9 +317,6 @@ class DMMFormat(BaseMapFormat):
             return self.tileTypes[tid]
         self.tileChunk2ID[tileChunk]=t.origID
         t.instances = self.consumeTileAtoms(tileChunk, lineNumber)
-        if t.origID == 0:
-            print('{} -> {}'.format(t.origID,tileChunk))
-            print('AKA {}'.format(str(t)))
         return t
     
     def consumeTileID(self, line):
@@ -346,9 +343,6 @@ class DMMFormat(BaseMapFormat):
     def SerializeTile(self, tile):
         # "aat" = (/obj/structure/grille,/obj/structure/window/reinforced{dir = 8},/obj/structure/window/reinforced{dir = 1},/obj/structure/window/reinforced,/obj/structure/cable{d1 = 2; d2 = 4; icon_state = "2-4"; tag = ""},/turf/simulated/floor/plating,/area/security/prison)
         atoms = []
-        if tile.origID == 0:
-            print(str(tile))
-            print('len = {}'.format(len(tile.instances)))
         for i in xrange(len(tile.instances)):
             atom = tile.instances[i]
             if atom.path != '':
@@ -404,8 +398,6 @@ class DMMFormat(BaseMapFormat):
         self.serialize_cleanly = kwargs.get('clean', True)
         self.dump_inherited = kwargs.get('inherited', False)
         
-        #print('"aaa" = {}'.format(self.map.GetTileAt(0,0,0)))
-        
         # Preprocess and assign IDs.
         idlen = 0
         it = self.map.Tiles()
@@ -445,23 +437,13 @@ class DMMFormat(BaseMapFormat):
                     tid+=1
                 #print('{} assigned to new TID {}'.format(strt,tid))
             maxid=max(maxid,tid)
-
-            #if tid == 0: print('<{},{},{}> {}: {}'.format(it.x, it.y, it.z, tid, str(tile)))
             self.typeMap[tid] = (strt,self.SerializeTile(tile))
             last_str = strt
             hashMap[strt]=tid
-            
-        ############################################################################
-        ## HACK ALERT BECAUSE SOMETHING'S HORRIBLY WRONG AND I DON'T KNOW WHAT IT IS
-        ############################################################################
-        self.typeMap[0]=(self.typeMap[0][0],'(/turf/space,/area)')
-        ### /hack
         
         idlen=len(self.ID2String(maxid))
         tmpfile = filename + '.tmp'
         print('Opening {} for write...'.format(tmpfile))
-        print('idlen = {}'.format(idlen))
-        print('"aaa" = {}'.format(self.typeMap[0][1]))
         start = clock()
         with open(tmpfile, 'w') as f:
             for tid in sorted(self.typeMap.keys()):
