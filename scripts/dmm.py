@@ -2,7 +2,7 @@
 """
 dmm.py - Collection of map tools.
 
-Copyright 2013 Rob "N3X15" Nelson <nexis@7chan.org>
+Copyright 2013-2014 Rob "N3X15" Nelson <nexis@7chan.org>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,8 +25,10 @@ THE SOFTWARE.
 """
 import sys, argparse, os, re
 from byond import ObjectTree, Map, MapRenderFlags
+from byond.map.format.dmm import DMMFormat
 
 def main():
+    dmmt = DMMFormat(None)
     opt = argparse.ArgumentParser()  # version='0.1')
     opt.add_argument('--project', default='baystation12.dme', type=str, help='Project file.', metavar='environment.dme')
     
@@ -38,6 +40,7 @@ def main():
     _compare.add_argument('mine', type=str, help='The other side.', metavar='mine.dmm')
     
     _patch = command.add_parser('patch', help='Apply a map patch.')
+    _patch.add_argument('-O', '--output', dest='output', type=str, help='Where to place the patched map. (Default is to overwrite input map)', metavar='mine.dmdiff', nargs='?')
     _patch.add_argument('patch', type=str, help='Patch to apply.', metavar='patch.dmmpatch')
     _patch.add_argument('map', type=str, help='The map to change.', metavar='map.dmm')
     
@@ -66,8 +69,8 @@ def patch_dmm(args):
         sys.exit(1)
         
     dmm = Map(forgiving_atom_lookups=True)
-    dmm.readMap(args.map)
-    
+    dmm.Load(args.map,format='dmm')
+
     context = None
     added = 0
     removed = 0
@@ -75,11 +78,12 @@ def patch_dmm(args):
     def printReport(context, added, removed):
         if context is not None:
             x, y, z = context
-            print(' <{},{},{}> +{} -{}'.format(x, y, z, added, removed))
+            print(' Z={} +{} -{}'.format(z, added, removed))
     
     REG_INSTRUCTION = re.compile(r'^(?P<change>[\+\-])(?P<amount>[0-9]+)?\s+(?P<atom>/.*)')
     with open(args.patch) as f:
         ln = 0
+        lz = -1
         for line in f:
             ln += 1
             line = line.strip()
@@ -90,8 +94,10 @@ def patch_dmm(args):
                 newcoords = []
                 for coord in strcoords:
                     newcoords += [int(coord)]
-                printReport(context, added, removed)
-                added = removed = 0
+                if context is not None and lz != context[2]:
+                    printReport(context, added, removed)
+                    lz = context[2]
+                    added = removed = 0
                 context = newcoords
                 continue
             if line.startswith('+') or line.startswith('-'):
@@ -101,31 +107,39 @@ def patch_dmm(args):
                     sys.exit(1)
                 amount = int(m.group('amount') or 1)
                 change = m.group('change')
-                atom_id = dmm.AtomChunk2ID(m.group('atom'))
                 
+                fmt = DMMFormat(dmm)
+                atom = fmt.consumeAtom(m.group('atom'), ln)
+                if atom is None:
+                    print('{}:{}: WARNING: Unable to parse instance specified by chunk {}'.format(args.patch, ln, m.group('atom')))
+                    continue
+
                 x, y, z = context
+                if x==0 and y==0 and z ==0:
+                    print('WE AT <0,0,0> SOMEFIN WRONG')
+                    
+                if z >= len(dmm.zLevels): continue
                 
+                tile = dmm.CopyTileAt(x, y, z)
                 if change == '-':
-                    if atom_id is None:
-                        print('{}:{}: WARNING: Unable to find instance specified by chunk {}'.format(args.patch, ln, m.group('atom')))
-                        continue
-                    atom = dmm.getInstance(atom_id)
-                    tile = dmm.GetTileAt(x, y, z)
                     for _ in range(amount):
                         if tile.CountAtom(atom) > 0:
-                            tile.RemoveAtom(atom)
-                            removed -= 1
+                            tile.RemoveAtom(atom, hash=False)
+                            removed += 1
                 elif change == '+':
-                    if atom_id is None:
-                        atom_id = dmm.consumeAtom(m.group('atom'), ln)
-                    atom = dmm.getInstance(atom_id)
-                    tile = dmm.GetTileAt(x, y, z)
                     for _ in range(amount):
-                        tile.AppendAtom(atom)
+                        #TODO: Fix me
+                        tile.AppendAtom(atom, hash=False)
+                        #print(' + {}'.format(atom))
+                        #break
                     added += amount
+                tile.UpdateHash()
+                dmm.SetTileAt(x, y, z, tile)
+                #print('{} - {}'.format((x,y,z),tile))
         printReport(context, added, removed)
-    print('Saving with WRITE_OLD_IDS...')
-    dmm.writeMap(args.map, Map.WRITE_OLD_IDS)
+    
+    print('Saving...')
+    dmm.Save(args.output if args.output else args.map)
     
 def compare_dmm(args):
     if not os.path.isfile(args.theirs):
@@ -139,20 +153,15 @@ def compare_dmm(args):
         sys.exit(1)
         
     theirs_dmm = Map(forgiving_atom_lookups=True)
-    theirs_dmm.readMap(args.theirs)
+    theirs_dmm.Load(args.theirs, format='dmm')
     
     mine_dmm = Map(forgiving_atom_lookups=True)
-    mine_dmm.readMap(args.mine)
-    
-    if theirs_dmm.width != mine_dmm.width:
-        print('Width is not equal: {} != {}.'.format(theirs_dmm.width, mine_dmm.width))
-        sys.exit(1)
-    if theirs_dmm.height != mine_dmm.height:
-        print('Height is not equal: {} != {}.'.format(theirs_dmm.height, mine_dmm.height))
-        sys.exit(1)
+    mine_dmm.Load(args.mine, format='dmm')
     
     ttitle, _ = os.path.splitext(os.path.basename(args.theirs))
     mtitle, _ = os.path.splitext(os.path.basename(args.mine))
+    
+    format = DMMFormat(None)
     
     output = '{} - {}.dmmpatch'.format(ttitle, mtitle)
     if args.output:
@@ -166,7 +175,7 @@ def compare_dmm(args):
         }
         print('Comparing maps...')
         print('len(theirs_dmm.zLevels) = {}'.format(len(theirs_dmm.zLevels)))
-        for z in theirs_dmm.zLevels.keys():
+        for z in xrange(len(theirs_dmm.zLevels)):
             t_zlev = theirs_dmm.zLevels[z]
             m_zlev = mine_dmm.zLevels[z]
             if t_zlev.height != m_zlev.height or t_zlev.width != m_zlev.width:
@@ -192,14 +201,14 @@ def compare_dmm(args):
                     
                     if tTile:
                         for A in tTile.GetAtoms():
-                            key = A.MapSerialize()
+                            key = format.SerializeAtom(A)
                             all_keys.add(key)
                             if key not in theirs:
                                 theirs[key] = [A, 0]
                             theirs[key][1] += 1
                     if mTile:
                         for A in mTile.GetAtoms():
-                            key = A.MapSerialize()
+                            key = format.SerializeAtom(A)
                             all_keys.add(key)
                             if key not in mine:
                                 mine[key] = [A, 0]
@@ -234,7 +243,7 @@ def compare_dmm(args):
                                 f.write(' {}{} {}\n'.format(change, abs_amt, key))
                             else:
                                 f.write(' {} {}\n'.format(change, key))
-                            stats['diffs'] += amount
+                            stats['diffs'] += abs_amt
         print('Compared maps: {} differences in {} tiles.'.format(stats['diffs'], stats['tilediffs']))
         print('Total: {} atoms, {} tiles.'.format(stats['diffs'], stats['tilediffs']))
 

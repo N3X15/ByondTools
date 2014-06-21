@@ -22,34 +22,19 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 """
-import os, itertools, sys
+import os, itertools, sys, numpy, logging, hashlib
+from byond.map.format import GetMapFormat, Load as LoadMapFormats
 from byond.DMI import DMI
 from byond.directions import SOUTH, IMAGE_INDICES
 from byond.basetypes import Atom, BYONDString, BYONDValue, BYONDFileRef, BYOND2RGBA
 # from byond.objtree import ObjectTree
 from PIL import Image, ImageChops
-import logging
-
-ID_ENCODING_TABLE = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
 # Cache
 _icons = {}
 _dmis = {}
         
-def chunker(iterable, chunksize):
-    """
-    Return elements from the iterable in `chunksize`-ed lists. The last returned
-    chunk may be smaller (if length of collection is not divisible by `chunksize`).
-
-    >>> print list(chunker(xrange(10), 3))
-    [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]]
-    """
-    i = iter(iterable)
-    while True:
-        wrapped_chunk = [list(itertools.islice(i, int(chunksize)))]
-        if not wrapped_chunk[0]:
-            break
-        yield wrapped_chunk.pop()
+LoadMapFormats()
 
 # From StackOverflow
 def trim(im):
@@ -64,10 +49,42 @@ def trim(im):
 def tint_image(image, tint_color):
     return ImageChops.multiply(image, Image.new('RGBA', image.size, tint_color))
 
-class Tile:
-    FLAG_USE_OLD_ID = 1
-    FLAG_INHERITED_PROPERTIES = 2
+class TileIterator:
+    def __init__(self, _map):
+        self.map = _map
+        self.x = -1
+        self.y = 0
+        self.z = 0
+
+        self.max_z = len(self.map.zLevels)
+        
+    def __iter__(self):
+        return self
     
+    def __next__(self):
+        return self.next()
+    
+    def next(self):
+        self.x += 1
+        
+        zLev = self.map.zLevels[self.z]
+        
+        if self.x >= zLev.width:
+            self.y += 1
+            self.x = 0
+            
+        if self.y >= zLev.height:
+            self.z += 1
+            self.y = 0
+            
+        if self.z >= self.max_z:
+            raise StopIteration
+        
+        t = self.map.GetTileAt(self.x, self.y, self.z)
+        #print('{} = {}'.format((self.x,self.y,self.z),str(t)))
+        return t
+
+class Tile(object):
     def __init__(self, _map):
         self.origID = ''
         self.ID = 0
@@ -77,20 +94,36 @@ class Tile:
         self.areaSelected = True
         self.log = logging.getLogger(__name__ + '.Tile')
         self.map = _map
+        self._hash = None
         
-    def RemoveAtom(self, atom):
+    def UpdateHash(self):
+        if self._hash is None:
+            self._hash = hashlib.md5(str(self)).hexdigest()
+        
+    def InvalidateHash(self):
+        self._hash = None
+        
+    def GetHash(self):
+        self.UpdateHash()
+        return self._hash
+        
+    def RemoveAtom(self, atom, hash=True):
         '''
         :param Atom atom:
             Atom to remove.  Raises ValueError if not found.
         '''
-        self.instances.remove(atom.id)
+        self.instances.remove(atom)
+        self.InvalidateHash()
+        if hash: self.UpdateHash()
         
-    def AppendAtom(self, atom):
+    def AppendAtom(self, atom, hash=True):
         '''
         :param Atom atom:
             Atom to add.
         '''
-        self.instances.append(atom.id)
+        self.instances.append(atom)
+        self.InvalidateHash()
+        if hash: self.UpdateHash()
         
     def CountAtom(self, atom):
         '''
@@ -98,26 +131,20 @@ class Tile:
             Atom to count.
         :return int: Count of atoms
         '''
-        return self.instances.count(atom.id)
+        return self.instances.count(atom)
     
-    def ID2String(self, pad=0):
-        o = ''
-        _id = self.ID
-        IET_SIZE = len(ID_ENCODING_TABLE)
-        while(_id >= len(ID_ENCODING_TABLE)):
-            i = _id % IET_SIZE
-            o = ID_ENCODING_TABLE[i] + o
-            _id -= i
-            _id /= IET_SIZE
-        o = ID_ENCODING_TABLE[_id] + o
-        if pad > len(o):
-            o = o.rjust(pad, ID_ENCODING_TABLE[0])
-        return o
+    def copy(self, origID=False):
+        tile = self.map.CreateTile()
+        tile.instances = self.instances
+        if origID:
+            tile.origID = self.origID
+        
+        tile.UpdateHash()
+        return tile
     
     def GetAtoms(self):
         atoms = []
-        for instance in self.instances:
-            atom = self.map.getInstance(instance)
+        for atom in self.instances:
             if atom is None: continue
             atoms += [atom]
         return atoms
@@ -132,44 +159,18 @@ class Tile:
         return self.instances
     
     def __str__(self):
-        return self.MapSerialize(Tile.FLAG_USE_OLD_ID)
-        
-    def MapSerialize(self, flags=0, padding=0):
-        # "aat" = (/obj/structure/grille,/obj/structure/window/reinforced{dir = 8},/obj/structure/window/reinforced{dir = 1},/obj/structure/window/reinforced,/obj/structure/cable{d1 = 2; d2 = 4; icon_state = "2-4"; tag = ""},/turf/simulated/floor/plating,/area/security/prison)
-        atoms = []
-        atomFlags = 0
-        if flags & Tile.FLAG_INHERITED_PROPERTIES:
-            atomFlags |= Atom.FLAG_INHERITED_PROPERTIES
-        for i in xrange(len(self.instances)):
-            iid = self.instances[i]
-            # print('{0} = {1}'.format(repr(i), repr(iid)))
-            atom = self.map.getInstance(iid)
-            if atom.path != '':
-                atoms += [atom.MapSerialize(atomFlags)]
-        if not (flags & Tile.FLAG_USE_OLD_ID):
-            return '"{ID}" = ({atoms})'.format(ID=self.ID2String(padding), atoms=','.join(atoms))
-        else:
-            return '"{ID}" = ({atoms})'.format(ID=self.origID, atoms=','.join(atoms))
-        
-    def MapSerialize2(self, flags=0, padding=0):
-        '''
-        DMM2 serialization method.
-        '''
-        # "aat" = (/obj/structure/grille,/obj/structure/window/reinforced{dir = 8},/obj/structure/window/reinforced{dir = 1},/obj/structure/window/reinforced,/obj/structure/cable{d1 = 2; d2 = 4; icon_state = "2-4"; tag = ""},/turf/simulated/floor/plating,/area/security/prison)
-        atomFlags = 0
-        if flags & Tile.FLAG_INHERITED_PROPERTIES:
-            atomFlags |= Atom.FLAG_INHERITED_PROPERTIES
-        instancelist = ','.join([str(i) for i in self.GetInstances()])
-        if not (flags & Tile.FLAG_USE_OLD_ID):
-            return '"{ID}" = ({atoms})'.format(ID=self.ID2String(padding), atoms=instancelist)
-        else:
-            return '"{ID}" = ({atoms})'.format(ID=self.origID, atoms=instancelist)
+        return self._serialize()
+    
+    def __ne__(self, tile):
+        return not self.__eq__(tile)
     
     def __eq__(self, other):
-        if len(self.instances) != len(other.instances):
-            return False
-        else:
-            return all(self.instances[i] == other.instances[i] for i in xrange(len(self.instances)))
+        return other and ((other._hash and self._hash and self._hash == other._hash) or (len(self.instances) == len(other.instances) and self.instances == other.instances))
+        # else:
+        #    return all(self.instances[i] == other.instances[i] for i in xrange(len(self.instances)))
+    
+    def _serialize(self):
+        return ','.join([str(i) for i in self.GetInstances()])
         
     def RenderToMapTile(self, passnum, basedir, renderflags, **kwargs):
         img = Image.new('RGBA', (96, 96))
@@ -298,6 +299,8 @@ class Tile:
         
         return img
     
+vTile = numpy.vectorize(Tile)
+
 class MapLayer:
     def __init__(self, _map, height=255, width=255):
         self.map = _map
@@ -305,121 +308,53 @@ class MapLayer:
         self.max = (height, width)
         self.height = height
         self.width = width
-        self.tiles = [[0 for _ in xrange(self.width)] for _ in xrange(self.height)]
+        self.tiles = numpy.empty((height, width), object)
         
-    def SetTileAt(self, x, y, tile):
-        grow = False
-        if y >= self.height:
-            self.height = y + 1
-            grow = True
-        if x >= self.width:
-            self.width = x + 1
-            grow = True
-        if grow:
-            self.grow()
-        try:
-            self.tiles[y][x] = tile.ID
-        except IndexError:
-            logging.critical('Failed to set self.tiles[{}][{}]: IndexError'.format(y, x))
-            logging.critical('width: {}'.format(self.width))
-            logging.critical('height: {}'.format(self.height))
-            logging.critical('real width: {}'.format(len(self.tiles)))
-            logging.critical('real height: {}'.format(len(self.tiles[0])))
-            sys.exit(1)
-    
-    def grow(self):
-        gamt = self.height - len(self.tiles)
-        if gamt > 0:
-            logging.debug('y += ' + str(gamt))
-            self.tiles += [[0] for _ in xrange(gamt)]
-        gamt = 0
-        for y in range(len(self.tiles)):
-            gamt = self.width - len(self.tiles[y])
-            if gamt > 0:
-                self.tiles[y] += [0 for _ in xrange(gamt)]
-                logging.debug('x[{}] += {}'.format(y, gamt))
+        self.tiles[:, :] = vTile(self)
         
-    def GetTileAt(self, x, y):
-        # print(repr(self.tiles))
-        return self.map.tileTypes[self.tiles[y][x]]
+    def Resize(self,height,width):
+        self.height=height
+        self.width=width
+        self.tiles.resize(height,width)
     
 class MapRenderFlags:
     RENDER_STARS = 1
     RENDER_AREAS = 2
     
 class Map:
-    WRITE_OLD_IDS = 1
-    
-    READ_NO_BASE_COMP = 1
     def __init__(self, tree=None, **kwargs):
-        self.filename = 'Unknown'
-        self.readFlags = 0
-        self.tileTypes = []
-        self.instances = []
-        self.zLevels = {}
-        self.oldID2NewID = {}
+        self.zLevels = []
         self.DMIs = {}
-        self.width = 0
-        self.height = 0
-        self.idlen = 0
         self.tree = tree
         self.generatedTexAtlas = False
         self.selectedAreas = ()
         self.whitelistTypes = None
         self.forgiving_atom_lookups = kwargs.get('forgiving_atom_lookups', False)
-        self.missing_atoms = set()
         
         self.log = logging.getLogger(__name__ + '.Map')
-
-        self.duplicates = 0
-        self.tileChunk2ID = {}
+        
+    def CreateZLevel(self, height, width, z= -1):
+        zLevel = MapLayer(self, height, width)
+        if z >= 0:
+            self.zLevels[z] = zLevel
+        else:
+            self.zLevels.append(zLevel)
+        return zLevel
     
-        self.atomBorders = {
-            '{':'}',
-            '"':'"',
-            '(':')'
-        }
-        self.atomCache = {}
-        nit = self.atomBorders.copy()
-        for start, stop in self.atomBorders.items():
-            if start != stop:
-                nit[stop] = None
-        self.atomBorders = nit
-        
-    def readMap(self, filename, flags=0):
-        self.readFlags = flags
-        if not os.path.isfile(filename):
-            logging.warn('File ' + filename + " does not exist.")
-        self.filename = filename
-        with open(filename, 'r') as f:
-            print('--- Reading tile types from {0}...'.format(self.filename))
-            self.consumeTiles(f)
-            print('--- Reading tile positions...')
-            self.consumeTileMap(f)
-            
-            
-        
-    def writeMap(self, filename, flags=0):
-        self.filename = filename
-        tileFlags = 0
-        if flags & Map.WRITE_OLD_IDS:
-            tileFlags |= Tile.FLAG_USE_OLD_ID
-        padding = len(self.tileTypes[-1].ID2String())
-        with open(filename, 'w') as f:
-            for tile in self.tileTypes:
-                f.write('{0}\n'.format(tile.MapSerialize(tileFlags, padding)))
-            for z in self.zLevels.keys():
-                f.write('\n(1,1,{0}) = {{"\n'.format(z))
-                zlevel = self.zLevels[z]
-                for y in xrange(zlevel.height):
-                    for x in xrange(zlevel.width):
-                        tile = zlevel.GetTileAt(x, y)
-                        if flags & Map.WRITE_OLD_IDS:
-                            f.write(tile.origID)
-                        else:
-                            f.write(tile.ID2String(padding))
-                    f.write("\n")
-                f.write('"}\n')
+    def Tiles(self):
+        return TileIterator(self)
+    
+    def Load(self, filename, **kwargs):
+        _, ext = os.path.splitext(filename)
+        fmt=kwargs.get('format','dmm2' if ext=='dmm2' else 'dmm')
+        reader = GetMapFormat(self, fmt)
+        reader.Load(filename, **kwargs)
+    
+    def Save(self, filename, **kwargs):
+        _, ext = os.path.splitext(filename)
+        fmt=kwargs.get('format','dmm2' if ext=='dmm2' else 'dmm')
+        reader = GetMapFormat(self, kwargs.get('format',fmt))
+        reader.Save(filename, **kwargs)
         
     def writeMap2(self, filename, flags=0):
         self.filename = filename
@@ -450,60 +385,40 @@ class Map:
                     f.write("\n")
                 f.write('"}\n')
                 
-            
     def GetTileAt(self, x, y, z):
         '''
-        @rtype: Tile
+        :param int x:
+        :param int y:
+        :param int z:
+        :rtype Tile:
         '''
         if z < len(self.zLevels):
-            return self.zLevels[z].GetTileAt(x, y)
-        
-    def consumeTileMap(self, f):
-        zLevel = []
-        y = 0
-        z = 0
-        inZLevel = False
-        width = 0
-        height = 0
-        while True:
-            line = f.readline()
-            if line == '':
-                return
-            # (1,1,1) = {"
-            if line.startswith('('):
-                coordChunk = line[1:line.index(')')].split(',')
-                # print(repr(coordChunk))
-                z = int(coordChunk[2])
-                zLevel = MapLayer(self, 255, 255)
-                inZLevel = True
-                y = 0
-                width = 0
-                height = 0
-                continue
-            if line.strip() == '"}':
-                inZLevel = False
-                if height == 0:
-                    height = y
-                newZ = MapLayer(self, height, width)
-                self.zLevels[z] = newZ
-                for ny in range(height):
-                    for nx in range(width):
-                        newZ.SetTileAt(nx, ny, zLevel.GetTileAt(nx, ny))
-                self.log.info('Added map layer {0} ({1}x{2})'.format(z, height, width))
-                # print(' * Added map layer {0} ({1}x{2})'.format(z, height, width))
-                continue
-            if inZLevel:
-                if width == 0:
-                    width = len(line) / self.idlen
-                if width > 255:
-                    logging.warn("Warning: Line is {} blocks long!".format(width))
-                x = 0
-                for chunk in chunker(line.strip(), self.idlen):
-                    chunk = ''.join(chunk)
-                    tid = self.oldID2NewID[chunk]
-                    zLevel.SetTileAt(x, y, self.tileTypes[tid])
-                    x += 1
-                y += 1
+            return self.zLevels[z].tiles[x, y]
+                
+    def CopyTileAt(self, x, y, z):
+        '''
+        :param int x:
+        :param int y:
+        :param int z:
+        :rtype Tile:
+        '''
+        if z < len(self.zLevels):
+            return self.zLevels[z].tiles[x, y].copy()
+                
+    def SetTileAt(self, x, y, z, tile):
+        '''
+        :param int x:
+        :param int y:
+        :param int z:
+        '''
+        if z < len(self.zLevels):
+            self.zLevels[z].tiles[x, y] = tile
+                
+    def CreateTile(self):
+        '''
+        :rtype Tile:
+        '''
+        return Tile(self)
                 
     def generateTexAtlas(self, basedir, renderflags=0):
         if self.generatedTexAtlas:
@@ -863,72 +778,6 @@ class Map:
             X + icon_width,
             Y + icon_height
         )
-
-    def consumeTiles(self, f):
-        index = 0
-        self.duplicates = 0
-        lineNumber = 0
-        self.tileChunk2ID = {}
-        while True:
-            line = f.readline()
-            lineNumber += 1
-            if line.startswith('"'):
-                t = self.consumeTile(line, lineNumber)
-                t.ID = index
-                self.tileTypes += [t]
-                self.idlen = max(self.idlen, len(t.ID2String()))
-                self.oldID2NewID[t.origID] = t.ID
-                index += 1
-                # No longer needed, 2fast.
-                # if((index % 100) == 0):
-                #    print(index)
-            else:
-                self.log.info('-- {} tiles loaded, {} duplicates discarded'.format(index, self.duplicates))
-                return 
-    
-    def AtomChunk2ID(self, chunk):
-        '''
-        :param str chunk:
-            Serialized atom data to find.
-        :return int:
-            Instance ID.
-        '''
-        if chunk in self.atomCache:
-            return self.atomCache[chunk]
-        return None
-            
-    def consumeTile(self, line, lineNumber):
-        t = Tile(self)
-        t.origID = self.consumeTileID(line)
-        tileChunk = line.strip()[line.index('(') + 1:-1]
-        
-        if tileChunk in self.tileChunk2ID:
-            tid = self.tileChunk2ID[tileChunk]
-            self.log.warn('{} duplicate of {}! Installing redirect...'.format(t.origID, tid))
-            self.oldID2NewID[t.origID] = tid
-            self.duplicates += 1
-            return self.tileTypes[tid]
-        
-        t.instances = self.consumeTileAtoms(tileChunk, lineNumber)
-        return t
-    def getInstanceID(self, atom):
-        for tile in self.tileTypes:
-            if tile == atom:
-                return tile.ID
-        return None
-    
-    def SerializedToTypeID(self, serdata):
-        for instance in self.instances:
-            if instance.MapSerialize() == serdata:
-                return instance.id
-        return None
-    
-    def consumeTileID(self, line):
-        e = line.index('"', 1)
-        return line[1:e]
-    
-    def GetInstances(self):
-        return self.instances
     
     # So we can read a map without parsing the tree.
     def GetAtom(self, path):
@@ -939,203 +788,4 @@ class Map:
                 return Atom(path, self.filename, missing=True)
             return atom
         return Atom(path)
-    
-    def consumeTileAtoms(self, line, lineNumber):
-        instances = []
-        atom_chunks = self.SplitAtoms(line)
-
-        for atom_chunk in atom_chunks:
-            if atom_chunk in self.atomCache:
-                instances += [self.atomCache[atom_chunk]]
-            else:
-                atom_id = self.consumeAtom(atom_chunk, lineNumber)
-                self.atomCache[atom_chunk] = atom_id
-                instances += [atom_id]
-            
-        return instances
-    
-    def SplitProperties(self, string):
-        o = []
-        buf = []
-        inString = False
-        for chunk in string.split(';'):
-            if not inString:
-                if '"' in chunk:
-                    inString = False
-                    pos = 0
-                    while(True):
-                        pos = chunk.find('"', pos)
-                        if pos == -1:
-                            break
-                        pc = ''
-                        if pos > 0:
-                            pc = chunk[pos - 1]
-                        if pc != '\\':
-                            inString = not inString
-                        pos += 1
-                    if not inString:
-                        o += [chunk]
-                    else:
-                        buf += [chunk]
-                else:
-                    o += [chunk]
-            else:
-                if '"' in chunk:
-                    o += [';'.join(buf + [chunk])]
-                    inString = False
-                    buf = []
-                else:
-                    buf += [chunk]
-        return o
-    
-    def SplitAtoms(self, string):
-        ignoreLevel = []
-        
-        o = []
-        buf = ''
-        
-        string = string.rstrip()
-        line_len = len(string)
-        for i in xrange(line_len):
-            c = string[i]
-            pc = ''
-            if i > 0:
-                pc = string[i - 1]
-            
-            if c in self.atomBorders and pc != '\\':
-                end = self.atomBorders[c]
-                if end == c:  # Just toggle.
-                    if len(ignoreLevel) > 0:
-                        if ignoreLevel[-1] == c:
-                            ignoreLevel.pop()
-                        else:
-                            ignoreLevel.append(c)
-                else:
-                    if end == None:
-                        if len(ignoreLevel) > 0:
-                            if ignoreLevel[-1] == c:
-                                ignoreLevel.pop()
-                    else:
-                        ignoreLevel.append(end)
-            if c == ',' and len(ignoreLevel) == 0:
-                o += [buf]
-                buf = ''
-            else:
-                buf += c
-                    
-        if len(ignoreLevel) > 0:
-            print(repr(ignoreLevel))
-            sys.exit()
-        return o + [buf]
-    
-    def consumeAtom(self, line, lineNumber):
-        if '{' not in line:
-            atom = line.strip()
-            if atom.endswith('/'):
-                self.log.warn('{file}:{line}: Malformed atom: {data} has ending slash.  Stripping slashes from right side.'.format(file=self.filename, line=lineNumber, data=atom))
-                atom = atom.rstrip('/')
-            currentAtom = self.GetAtom(atom)
-            if currentAtom is not None:
-                return self.AssignIID(currentAtom)
-            else:
-                self.log.critical('{file}:{line}: Failed to consumeAtom({data}):  Unable to locate atom.'.format(file=self.filename, line=lineNumber, data=line))
-                return None
-        chunks = line.split('{')
-        if len(chunks) < 2:
-            self.log.error('{file}:{line}: Something went wrong in consumeAtom(). line={data}'.format(file=self.filename, line=lineNumber, data=line))
-        atom = chunks[0].strip()
-        if atom.endswith('/'):
-            self.log.warn('{file}:{line}: Malformed atom: {data} has ending slash.  Stripping slashes from right side.'.format(file=self.filename, line=lineNumber, data=atom))
-            atom = atom.rstrip('/')
-        currentAtom = self.GetAtom(atom)
-        if currentAtom is not None:
-            currentAtom = currentAtom.copy()
-        else:
-            return None
-        if chunks[1].endswith('}'):
-            chunks[1] = chunks[1][:-1]
-        property_chunks = self.SplitProperties(chunks[1])
-        mapSupplied = []
-        for chunk in property_chunks:
-            if chunk.endswith('}'):
-                chunk = chunk[:-1]
-            pparts = chunk.split('=', 1)
-            key = pparts[0].strip()
-            value = pparts[1].strip()
-            if key == '':
-                self.log.warn('Ignoring property with blank name. (given {0})'.format(chunk))
-                continue
-            data = self.consumeDataValue(value, lineNumber)
-            if key not in currentAtom.mapSpecified:
-                mapSupplied += [key]
-            currentAtom.properties[key] = data
-        
-        currentAtom.mapSpecified = mapSupplied
-                
-        # Compare to base
-        if not (self.readFlags & Map.READ_NO_BASE_COMP):
-            base_atom = self.GetAtom(currentAtom.path)
-            assert base_atom != None
-            # for key in base_atom.properties.keys():
-            #    val = base_atom.properties[key]
-            #    if key not in currentAtom.properties:
-            #        currentAtom.properties[key] = val
-            for key in currentAtom.properties.iterkeys():
-                val = currentAtom.properties[key].value
-                if key in base_atom.properties and val == base_atom.properties[key].value:
-                    if key in currentAtom.mapSpecified:
-                        currentAtom.mapSpecified.remove(key)
-                        # print('Removed {0} from atom: Equivalent to base atom!')
-                        
-        return self.AssignIID(currentAtom)
-                        
-    def AssignIID(self, atom, replacing=None):
-        if atom not in self.instances:
-            if replacing is not None:
-                atom.id = replacing
-                self.instances[replacing] = atom
-                return replacing
-            else:
-                atom.id = len(self.instances)
-                self.instances.append(atom)
-                return atom.id
-        else:
-            r_iid = self.instances.index(atom)
-            if replacing is not None:
-                self.ReplaceIIDs(replacing, r_iid)
-            return r_iid
-            
-    def consumeDataValue(self, value, lineNumber):
-        data = None
-        if value[0] in ('"', "'"):
-            quote = value[0]
-            if quote == '"':
-                data = BYONDString(value[1:-1], self.filename, lineNumber)
-            elif quote == "'":
-                data = BYONDFileRef(value[1:-1], self.filename, lineNumber)
-        elif value == 'null':
-            data = BYONDValue(None, self.filename, lineNumber)
-        else:
-            data = BYONDValue(value, self.filename, lineNumber)
-        return data
-    
-    def getInstance(self, iid):
-        if iid is None:
-            return None
-        return self.instances[iid] 
-    
-    def setInstance(self, iid, atom):
-        if iid is None:
-            return None
-        return self.AssignIID(atom, iid)
-        
-    def ReplaceIIDs(self, old_iid, new_iid):
-        updated = 0
-        for tid in xrange(len(self.tileTypes)):
-            for i in xrange(len(self.tileTypes[tid].instances)):
-                if old_iid == self.tileTypes[tid].instances[i]:
-                    self.tileTypes[tid].instances[i] = new_iid
-                    updated += 1
-        if updated > 0:
-            self.log.info('Updated {0} tiles (#{1} -> #{2})'.format(updated, old_iid, new_iid))
         
