@@ -146,6 +146,9 @@ class DMMFormat(BaseMapFormat):
                 t.UpdateHash()
                 self.tileTypes += [t]
                 self.idlen = max(self.idlen, len(self.ID2String(t.ID)))
+                if t.origID=='':
+                    print('{}:{}: ERROR: Unable to determine origID.'.format(self.filename,lineNumber))
+                    sys.exit(1)
                 self.oldID2NewID[t.origID] = t.ID
                 index += 1
                 # No longer needed, 2fast.
@@ -305,23 +308,26 @@ class DMMFormat(BaseMapFormat):
         return currentAtom
         
     def consumeTile(self, line, lineNumber=0, cache=True):
-        t = self.consumeTileChunk(line, lineNumber, cache)
-        t.origID = self.consumeTileID(line)
+        origid = self.consumeTileID(line)
+        t = self.consumeTileChunk(line, lineNumber, origID=origid)
+        
         return t
         
-    def consumeTileChunk(self, line, lineNumber=0, cache=True):
+    def consumeTileChunk(self, line, lineNumber=0, origID=None, cache=True):
         t = self.map.CreateTile()
         tileChunk = line.strip()[line.index('(') + 1:-1]
-        
-        if cache: 
+        if tileChunk == '':
+            print('{file}:{line}: MALFORMED TILE CHUNK: {}'.format(self.filename, lineNumber, tileChunk))
+        if cache and origID is not None: 
             if tileChunk in self.tileChunk2ID:
                 tid = self.tileChunk2ID[tileChunk]
-                print('{} duplicate of {}! Installing redirect...'.format(t.origID, tid))
-                self.oldID2NewID[t.origID] = tid
+                print('{} duplicate of {}! Installing redirect...'.format(origID, tid))
+                self.oldID2NewID[origID] = tid
                 self.duplicates += 1
                 return self.tileTypes[tid]
-            self.tileChunk2ID[tileChunk] = t.origID
+            self.tileChunk2ID[tileChunk] = origID
             
+        if origID is not None: t.origID = origID
         t.instances = self.consumeTileAtoms(tileChunk, lineNumber)
         return t
     

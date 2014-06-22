@@ -25,23 +25,23 @@ class FixNetwork(Matcher):
     
     def __str__(self):
         return 'Changed network property to list'
-    
-@MapFix('vgstation')
+   
+@MapFix('vgstation-NET2')
 class NetworkingChangeAtmos(ChangeType):
     def __init__(self):
         ChangeType.__init__(self,'/obj/machinery/atmospherics','/obj/machinery/networked/atmos', fuzzy = True)
     
-@MapFix('vgstation')
+@MapFix('vgstation-NET2')
 class NetworkingChangePower(ChangeType):
     def __init__(self):
         ChangeType.__init__(self,'/obj/machinery/power','/obj/machinery/networked/power', fuzzy = True)
     
-@MapFix('vgstation')
+@MapFix('vgstation-NET2')
 class NetworkingChangeFiber(ChangeType):
     def __init__(self):
         ChangeType.__init__(self,'/obj/machinery/fiber','/obj/machinery/networked/fiber', fuzzy = True)
-    
-
+   
+@MapFix('vgstation')
 class FixIDTags(Matcher):
     atomsToFix={}
     def __init__(self):

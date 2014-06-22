@@ -31,15 +31,16 @@ from byond.objtree import ObjectTree
 
 from byond import mapfixes
 
-
 opt = argparse.ArgumentParser()  # version='0.1')
+opt.add_argument('-O', '--output', dest='output', type=str, help='Where to place the patched map. (Default is to overwrite input map)', metavar='butts.dmm', nargs='?')
 opt.add_argument('-n', '--namespace', dest='namespaces', type=str, nargs='*', default=[], help='MapFix namespace to load (ss13, vgstation).')
 opt.add_argument('-N', '--no-deps', dest='no_dependencies', action='store_true', help='Stop loading of namespace dependencies.')
-opt.add_argument('-f', '--fix-script', dest='fixscripts', type=str, nargs='*', help='A script that specifies property and type replacements.')
+opt.add_argument('-f', '--fix-script', dest='fixscripts', type=str, nargs='*', default=[], help='A script that specifies property and type replacements.')
 
 opt.add_argument('dme', nargs='?', default='baystation12.dme', type=str,help='Project file.', metavar='environment.dme')
 opt.add_argument('map', type=str,help='Map to fix.', metavar='map.dmm')
 
+opt.set_defaults(no_dependencies=False)
 args = opt.parse_args()
 
 actions = []
@@ -83,38 +84,36 @@ print('Changes to make:')
 for action in actions:
     print(' * ' + str(action))
 dmm = Map(tree, forgiving_atom_lookups=1)
-dmm.readMap(args.map)
-dmm.writeMap2(args.map.replace('.dmm', '.dmm2'))
-for iid in xrange(len(dmm.instances)):
-    atom = dmm.getInstance(iid)
-    changes = []
-    for action in actions:
-        action.SetTree(tree)
-        if action.Matches(atom):
-            atom = action.Fix(atom)
-            changes += [str(action)]
-    atom.id = iid
-    
-    '''
-    compiled_atom = tree.GetAtom(atom.path)
-    if compiled_atom is not None:
-        for propname in list(atom.properties.keys()):
-            if propname not in compiled_atom.properties and propname not in ('req_access_txt','req_one_access_txt'):
-                del atom.properties[propname]
-                if propname in atom.mapSpecified:
-                    atom.mapSpecified.remove(propname)
-                changes += ['Dropped property {0} (not found in compiled atom)'.format(propname)]
-    '''
-    dmm.setInstance(iid, atom)
-    if len(changes) > 0:
-        print('{0} (#{1}):'.format(atom.path, atom.id))
-        for change in changes:
-            print(' * ' + change)
+dmm.Load(args.map)
+#dmm.Load(args.map.replace('.dmm', '.dmm2'))
+for tile in dmm.Tiles():
+    for atom in tile.GetAtoms():
+        changes = []
+        for action in actions:
+            action.SetTree(tree)
+            if action.Matches(atom):
+                atom = action.Fix(atom)
+                changes += [str(action)]
+        
+        '''
+        compiled_atom = tree.GetAtom(atom.path)
+        if compiled_atom is not None:
+            for propname in list(atom.properties.keys()):
+                if propname not in compiled_atom.properties and propname not in ('req_access_txt','req_one_access_txt'):
+                    del atom.properties[propname]
+                    if propname in atom.mapSpecified:
+                        atom.mapSpecified.remove(propname)
+                    changes += ['Dropped property {0} (not found in compiled atom)'.format(propname)]
+        '''
+        if len(changes) > 0:
+            print('{0} (#{1}):'.format(atom.path, atom.id))
+            for change in changes:
+                print(' * ' + change)
 #for atom, _ in atomsToFix.items():
 #    print('Atom {0} needs id_tag.'.format(atom))
 with open(args.map + '.missing', 'w') as f:
     for atom in sorted(dmm.missing_atoms):
         f.write(atom + "\n")
 print('--- Saving...')
-dmm.writeMap(args.map + '.fixed', Map.WRITE_OLD_IDS)        
-dmm.writeMap2(args.map.replace('.dmm', '.dmm2') + '.fixed')
+dmm.Save(args.output if args.output else args.map + '.fixed')        
+#dmm.writeMap2(args.map.replace('.dmm', '.dmm2') + '.fixed')

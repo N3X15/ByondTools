@@ -58,6 +58,20 @@ class NukeTags(Matcher):
     
     def __str__(self):
         return 'Removed tag'
+
+@MapFix(None)
+class NukeMergeMarkers(Matcher):
+    def __init__(self):
+        pass
+    
+    def Matches(self, atom):
+        return 'path' in atom.properties and atom.path == '/obj/effect/byondtools/changed'
+    
+    def Fix(self, atom):
+        return None
+    
+    def __str__(self):
+        return 'Removed tag'
     
 class RenameProperty(Matcher):
     '''

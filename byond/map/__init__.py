@@ -349,6 +349,8 @@ class Map:
         
         self.log = logging.getLogger(__name__ + '.Map')
         
+        self.missing_atoms=set()
+        
     def CreateZLevel(self, height, width, z= -1):
         zLevel = MapLayer(self, height, width)
         if z >= 0:
@@ -800,7 +802,7 @@ class Map:
             atom = self.tree.GetAtom(path)
             if atom is None and self.forgiving_atom_lookups:
                 self.missing_atoms.add(path)
-                return Atom(path, self.filename, missing=True)
+                return Atom(path, '(map)', missing=True)
             return atom
         return Atom(path)
         

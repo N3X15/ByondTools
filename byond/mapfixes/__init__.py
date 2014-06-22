@@ -4,7 +4,7 @@ from .base import MapFix, GetDependencies
 def Load():
     print('Loading MapFix Modules...')
     for f in glob.glob(os.path.dirname(__file__) + "/*.py"):
-        modName = 'mapfixes.' + os.path.basename(f)[:-3]
+        modName = 'byond.mapfixes.' + os.path.basename(f)[:-3]
         print(' Loading module ' + modName)
         mod = __import__(modName)
         for attr in dir(mod):
