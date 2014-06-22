@@ -25,6 +25,7 @@ THE SOFTWARE.
 """
 import sys, argparse, os, re
 from byond import ObjectTree, Map, MapRenderFlags
+from byond.basetypes import Atom
 from byond.map.format.dmm import DMMFormat
 
 def main():
@@ -78,6 +79,8 @@ def patch_dmm(args):
     added = 0
     removed = 0
     
+    changemarker=Atom('/obj/effect/byondtools/changed')
+    
     def printReport(context, added, removed):
         if context is not None:
             x, y, z = context
@@ -115,7 +118,9 @@ def patch_dmm(args):
                     
                     if args.clobber:
                         print('WARNING: <{},{},{}> has changed and will be overwritten. (--clobber)'.format(x, y, z))
-                        dmm.SetTileAt(x, y, z, fmt.consumeTileChunk(serdata, cache=False))
+                        t=fmt.consumeTileChunk(serdata, cache=False)
+                        t.AppendAtom(changemarker)
+                        dmm.SetTileAt(x, y, z, t)
                         skip_block = True
                         continue
                     curhash = dmm.GetTileAt(x, y, z).GetHash()
