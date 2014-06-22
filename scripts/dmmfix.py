@@ -86,9 +86,11 @@ for action in actions:
 dmm = Map(tree, forgiving_atom_lookups=1)
 dmm.Load(args.map)
 #dmm.Load(args.map.replace('.dmm', '.dmm2'))
-for tile in dmm.Tiles():
+warudo = dmm.Tiles()
+for tile in warudo:
     for atom in tile.GetAtoms():
         changes = []
+        tile.RemoveAtom(atom)
         for action in actions:
             action.SetTree(tree)
             if action.Matches(atom):
@@ -109,6 +111,8 @@ for tile in dmm.Tiles():
             print('{0} (#{1}):'.format(atom.path, atom.id))
             for change in changes:
                 print(' * ' + change)
+        if atom is not None:
+            tile.AppendAtom(atom)
 #for atom, _ in atomsToFix.items():
 #    print('Atom {0} needs id_tag.'.format(atom))
 with open(args.map + '.missing', 'w') as f:

@@ -150,6 +150,7 @@ class DMMFormat(BaseMapFormat):
                     print('{}:{}: ERROR: Unable to determine origID.'.format(self.filename,lineNumber))
                     sys.exit(1)
                 self.oldID2NewID[t.origID] = t.ID
+                self.tileChunk2ID[self.SerializeTile(t)] = t.ID
                 index += 1
                 # No longer needed, 2fast.
                 # if((index % 100) == 0):
@@ -309,25 +310,24 @@ class DMMFormat(BaseMapFormat):
         
     def consumeTile(self, line, lineNumber=0, cache=True):
         origid = self.consumeTileID(line)
-        t = self.consumeTileChunk(line, lineNumber, origID=origid)
-        
-        return t
-        
+        return self.consumeTileChunk(line, lineNumber, origID=origid)
+    
     def consumeTileChunk(self, line, lineNumber=0, origID=None, cache=True):
         t = self.map.CreateTile()
         tileChunk = line.strip()[line.index('(') + 1:-1]
         if tileChunk == '':
             print('{file}:{line}: MALFORMED TILE CHUNK: {}'.format(self.filename, lineNumber, tileChunk))
         if cache and origID is not None: 
+            #print('CACHING...')
             if tileChunk in self.tileChunk2ID:
-                tid = self.tileChunk2ID[tileChunk]
-                print('{} duplicate of {}! Installing redirect...'.format(origID, tid))
-                self.oldID2NewID[origID] = tid
+                parentID = self.tileChunk2ID[tileChunk]
+                print('{} duplicate of {}! Installing redirect...'.format(origID, parentID))
+                self.oldID2NewID[origID] = parentID
                 self.duplicates += 1
-                return self.tileTypes[tid]
-            self.tileChunk2ID[tileChunk] = origID
+                return self.tileTypes[parentID]
             
-        if origID is not None: t.origID = origID
+        if origID is not None:
+            t.origID = origID
         t.instances = self.consumeTileAtoms(tileChunk, lineNumber)
         return t
     

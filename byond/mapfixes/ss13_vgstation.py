@@ -8,6 +8,7 @@ from byond.directions import *
 
 DeclareDependencies('vgstation',['ss13'])
 
+ATMOSBASE = '/obj/machinery/atmospherics'
 @MapFix('vgstation')
 class FixNetwork(Matcher):
     def __init__(self):
@@ -71,24 +72,24 @@ class FixIDTags(Matcher):
 @MapFix('vgstation')
 class StandardizeManifolds(Matcher):
     STATE_TO_TYPE = {
-        'manifold-b'  :'/obj/machinery/networked/atmos/pipe/manifold/supply/visible',
-        'manifold-b-f':'/obj/machinery/networked/atmos/pipe/manifold/supply/hidden',
-        'manifold-r'  :'/obj/machinery/networked/atmos/pipe/manifold/scrubbers/visible',
-        'manifold-r-f':'/obj/machinery/networked/atmos/pipe/manifold/scrubbers/hidden',
-        'manifold-c'  :'/obj/machinery/networked/atmos/pipe/manifold/cyan/visible',
-        'manifold-c-f':'/obj/machinery/networked/atmos/pipe/manifold/cyan/hidden',
-        'manifold-y'  :'/obj/machinery/networked/atmos/pipe/manifold/yellow/visible',
-        'manifold-y-f':'/obj/machinery/networked/atmos/pipe/manifold/yellow/hidden',
-        'manifold-g'  :'/obj/machinery/networked/atmos/pipe/manifold/filtering/visible',
-        'manifold-g-f':'/obj/machinery/networked/atmos/pipe/manifold/filtering/hidden',
-        'manifold'    :'/obj/machinery/networked/atmos/pipe/manifold/general/visible',
-        'manifold-f'  :'/obj/machinery/networked/atmos/pipe/manifold/general/hidden',
+        'manifold-b'  :ATMOSBASE+'/pipe/manifold/supply/visible',
+        'manifold-b-f':ATMOSBASE+'/pipe/manifold/supply/hidden',
+        'manifold-r'  :ATMOSBASE+'/pipe/manifold/scrubbers/visible',
+        'manifold-r-f':ATMOSBASE+'/pipe/manifold/scrubbers/hidden',
+        'manifold-c'  :ATMOSBASE+'/pipe/manifold/cyan/visible',
+        'manifold-c-f':ATMOSBASE+'/pipe/manifold/cyan/hidden',
+        'manifold-y'  :ATMOSBASE+'/pipe/manifold/yellow/visible',
+        'manifold-y-f':ATMOSBASE+'/pipe/manifold/yellow/hidden',
+        'manifold-g'  :ATMOSBASE+'/pipe/manifold/filtering/visible',
+        'manifold-g-f':ATMOSBASE+'/pipe/manifold/filtering/hidden',
+        'manifold'    :ATMOSBASE+'/pipe/manifold/general/visible',
+        'manifold-f'  :ATMOSBASE+'/pipe/manifold/general/hidden',
     }
     def __init__(self):
         return
         
     def Matches(self, atom):
-        if atom.path == '/obj/machinery/networked/atmos/pipe/manifold' and 'icon_state' in atom.mapSpecified:
+        if atom.path == ATMOSBASE+'/pipe/manifold' and 'icon_state' in atom.mapSpecified:
             return atom.getProperty('icon_state') in self.STATE_TO_TYPE
         return False
     
@@ -105,9 +106,9 @@ class StandardizeManifolds(Matcher):
 @MapFix('vgstation')
 class StandardizePiping(Matcher):
     TYPE_TRANSLATIONS = {
-        '/obj/machinery/networked/atmos/pipe/simple': 'simple',
-        '/obj/machinery/networked/atmos/pipe/manifold': 'manifold',
-        '/obj/machinery/networked/atmos/pipe/manifold4w': 'manifold4w',
+        ATMOSBASE+'/pipe/simple': 'simple',
+        ATMOSBASE+'/pipe/manifold': 'manifold',
+        ATMOSBASE+'/pipe/manifold4w': 'manifold4w',
     }
     COLOR_CODES = {
         'b':'supply',
@@ -123,17 +124,17 @@ class StandardizePiping(Matcher):
         return
         
     def trans_simple(self, atom):
-        type_tmpl = '/obj/machinery/networked/atmos/pipe/simple/{color}/{visibility}'
+        type_tmpl = ATMOSBASE+'/pipe/simple/{color}/{visibility}'
         color_code, visible = self.parseIconState(atom.getProperty('icon_state', ''))
         return self.getNewType(type_tmpl, color_code, visible)
         
     def trans_manifold(self, atom):
-        type_tmpl = '/obj/machinery/networked/atmos/pipe/manifold/{color}/{visibility}'
+        type_tmpl = ATMOSBASE+'/pipe/manifold/{color}/{visibility}'
         color_code, visible = self.parseIconState(atom.getProperty('icon_state', ''))
         return self.getNewType(type_tmpl, color_code, visible)
         
     def trans_manifold4w(self, atom):
-        type_tmpl = '/obj/machinery/networked/atmos/pipe/manifold4w/{color}/{visibility}'
+        type_tmpl = ATMOSBASE+'/pipe/manifold4w/{color}/{visibility}'
         color_code, visible = self.parseIconState(atom.getProperty('icon_state', ''))
         return self.getNewType(type_tmpl, color_code, visible)
         
@@ -158,14 +159,14 @@ class StandardizePiping(Matcher):
         return atom.path in self.TYPE_TRANSLATIONS
     
     def Fix(self, atom):
-        self.before = atom.MapSerialize()
+        self.before = str(atom)
         old_dir = None
         if 'dir' in atom.mapSpecified:
             old_dir = int(atom.getProperty('dir', 2))
         atom = getattr(self, 'trans_{0}'.format(self.TYPE_TRANSLATIONS[atom.path]))(atom)
         if old_dir is not None and old_dir != 2:
             atom.setProperty('dir', old_dir, PropertyFlags.MAP_SPECIFIED)
-        self.after = atom.MapSerialize()
+        self.after = str(atom)
         return atom
     
     def __str__(self):
@@ -177,27 +178,27 @@ class StandardizePiping(Matcher):
 @MapFix('vgstation')
 class StandardizeInsulatedPipes(Matcher):
     STATE_TO_TYPE = {
-        'intact'  :'/obj/machinery/networked/atmos/pipe/simple/insulated/visible',
-        'intact-f':'/obj/machinery/networked/atmos/pipe/simple/insulated/hidden'
+        'intact'  :ATMOSBASE+'/pipe/simple/insulated/visible',
+        'intact-f':ATMOSBASE+'/pipe/simple/insulated/hidden'
     }
     def __init__(self):
         return
         
     def Matches(self, atom):
-        if atom.path == '/obj/machinery/networked/atmos/pipe/simple/insulated':
+        if atom.path == ATMOSBASE+'/pipe/simple/insulated':
             return True
-        if atom.path.startswith('/obj/machinery/networked/atmos/pipe/simple/insulated') and int(atom.getProperty('dir', 0)) in (3, 8, 12):
+        if atom.path.startswith(ATMOSBASE+'/pipe/simple/insulated') and int(atom.getProperty('dir', 0)) in (3, 8, 12):
             # print(atom.MapSerialize())
             return True
         return False
     
     def Fix(self, atom):
         newtype = atom.path
-        if atom.path == '/obj/machinery/networked/atmos/pipe/simple/insulated':
+        if atom.path == ATMOSBASE+'/pipe/simple/insulated':
             icon_state = ''
             if 'icon_state' in atom.properties:
                 icon_state = atom.properties['icon_state'].value
-            newtype = self.STATE_TO_TYPE.get(icon_state, '/obj/machinery/networked/atmos/pipe/simple/insulated/visible')
+            newtype = self.STATE_TO_TYPE.get(icon_state, ATMOSBASE+'/pipe/simple/insulated/visible')
         new_atom = Atom(newtype)
         if 'dir' in atom.mapSpecified:
             # Normalize dir
