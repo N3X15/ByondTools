@@ -45,6 +45,9 @@ def BYOND2RGBA(colorstring, alpha=255):
         r, g, b = colorstring[:2], colorstring[2:4], colorstring[4:]
         r, g, b = [int(n, 16) for n in (r, g, b)]
         return (r, g, b, alpha)
+    elif colorstring.startswith('rgb('):
+        r, g, b = [int(n.strip()) for n in colorstring[4:-1].split(',')]
+        return (r, g, b, alpha)
     else:
         return _COLOR_LOOKUP[colorstring]
     
@@ -202,7 +205,7 @@ class Atom:
         self.line = line
         
         # : Instance ID (maps only).  Used internally, do NOT change.
-        self.id = None
+        self.ID = None
         
         # : Instance ID that was read from the map.
         self.old_id = None
@@ -218,9 +221,28 @@ class Atom:
         
         self._hash = None
         
-    def UpdateHash(self):
+        # : Coords
+        self.coords = None
+        
+        # : Used for masters to track instance locations.
+        self.locations = []
+    def rmLocation(self, map, coord, autoclean=True):
+        if coord in self.locations:
+            self.locations.remove(coord)
+        if autoclean and len(self.locations) == 0:
+            map.instances[self.ID] = None  # Mark ready for recovery
+            map._instance_idmap.pop(self.GetHash(), None)
+    
+    def addLocation(self, coord):
+        self.locations.append(coord)
+        
+    def UpdateHash(self, no_map_update=False):
         if self._hash is None:
             self._hash = hashlib.md5(str(self)).hexdigest()
+
+    def UpdateMap(self, map):
+        self.UpdateHash()
+        map.UpdateAtom(self)
         
     def InvalidateHash(self):
         self._hash = None
@@ -238,7 +260,7 @@ class Atom:
         new_node = Atom(self.path, self.filename, self.line, missing=self.missing)
         new_node.properties = self.properties.copy()
         new_node.mapSpecified = self.mapSpecified
-        new_node.id = self.id
+        new_node.ID = self.ID
         new_node.old_id = self.old_id
         new_node.UpdateHash()
         # new_node.parent = self.parent

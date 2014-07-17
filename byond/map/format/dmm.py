@@ -105,19 +105,23 @@ class DMMFormat(BaseMapFormat):
                 y = 0
                 width = 0
                 height = 0
+                
+                start = clock()
                 continue
             if line.strip() == '"}':
+                zLevel.initial_load=False
                 inZLevel = False
                 if height == 0:
                     height = y
                 # self.map.zLevels[z] = zLevel
                 zLevel = None
                 # self.log.info('Added map layer {0} ({1}x{2})'.format(z, height, width))
-                print(' * Added map layer {0} ({1}x{2})'.format(z, height, width))
+                print(' * Added map layer {0} ({1}x{2}, {3})'.format(z, height, width, getElapsed(start)))
                 continue
             if inZLevel:
                 if zLevel is None:
                     zLevel = self.map.CreateZLevel(height, width)  # , z-1)
+                    zLevel.initial_load=True
                 if width == 0:
                     width = len(line) / self.idlen
                     # print('Width detected as {}.'.format(width))
@@ -126,9 +130,11 @@ class DMMFormat(BaseMapFormat):
                     logging.warn("Line is {} blocks long!".format(width))
                 x = 0
                 for chunk in chunker(line.strip(), self.idlen):
-                    chunk = self.String2ID(''.join(chunk))
+                    chunk = ''.join(chunk)
                     tid = self.oldID2NewID[chunk]
-                    zLevel.SetTile(x, y, self.tileTypes[tid].copy(origID=True))
+                    #if tid == 1:
+                    #    print('[{},{}] Chunk: {}, tid: {}'.format(x,y,chunk,tid))
+                    zLevel.SetTileID(x, y, tid)
                     x += 1
                 y += 1
                 
@@ -142,13 +148,15 @@ class DMMFormat(BaseMapFormat):
             lineNumber += 1
             if line.startswith('"'):
                 t = self.consumeTile(line, lineNumber)
-                t.ID = index
+                #t.ID = index
                 t.UpdateHash()
+                #print('Loaded tile #{} ({})'.format(t.ID,t._hash))
                 self.tileTypes += [t]
                 self.idlen = max(self.idlen, len(self.ID2String(t.ID)))
                 if t.origID=='':
                     print('{}:{}: ERROR: Unable to determine origID.'.format(self.filename,lineNumber))
                     sys.exit(1)
+                if t.origID == 'aaa': print('aaa = {}'.format(t.ID))
                 self.oldID2NewID[t.origID] = t.ID
                 self.tileChunk2ID[self.SerializeTile(t)] = t.ID
                 index += 1
@@ -168,10 +176,11 @@ class DMMFormat(BaseMapFormat):
                 instances += [self.atomCache[atom_chunk]]
             else:
                 atom = self.consumeAtom(atom_chunk, lineNumber)
+                self.map.UpdateAtom(atom)
                 self.atomCache[atom_chunk] = atom
                 instances += [atom]
             
-        return instances
+        return [x.ID for x in instances]
     
     def SplitProperties(self, string):
         o = []
@@ -333,7 +342,7 @@ class DMMFormat(BaseMapFormat):
     
     def consumeTileID(self, line):
         e = line.index('"', 1)
-        return self.String2ID(line[1:e])
+        return line[1:e]
             
     def SerializeAtom(self, atom):
         atomContents = []
@@ -356,8 +365,8 @@ class DMMFormat(BaseMapFormat):
         # "aat" = (/obj/structure/grille,/obj/structure/window/reinforced{dir = 8},/obj/structure/window/reinforced{dir = 1},/obj/structure/window/reinforced,/obj/structure/cable{d1 = 2; d2 = 4; icon_state = "2-4"; tag = ""},/turf/simulated/floor/plating,/area/security/prison)
         atoms = []
         for i in xrange(len(tile.instances)):
-            atom = tile.instances[i]
-            if atom.path != '':
+            atom = self.map.GetInstance(tile.instances[i])
+            if atom and atom.path != '':
                 atoms += [self.SerializeAtom(atom)]
 
         return '({atoms})'.format(atoms=','.join(atoms))
@@ -375,10 +384,10 @@ class DMMFormat(BaseMapFormat):
         return o
     
     def String2ID(self, _id):
-        o = 0
-        for i, c in enumerate(reversed(_id)):
-            o += ID_ENCODING_TABLE.index(c) * (IET_SIZE ** i)
-        return o
+        #o = 0
+        #for i, c in enumerate(reversed(_id)):
+        #    o += ID_ENCODING_TABLE.index(c) * (IET_SIZE ** i)
+        return _id
     
     def AssignTID(self, tile):
         '''
@@ -413,10 +422,10 @@ class DMMFormat(BaseMapFormat):
         # Preprocess and assign IDs.
         start = clock()
         idlen = 0
-        it = self.map.Tiles()
+        it = self.map.Locations()
         lz = -1
         last_str = None
-        start = None
+        start = clock()
         maxid = 0
         for tile in it:
             # print(str(tile))

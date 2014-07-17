@@ -65,13 +65,13 @@ class NukeMergeMarkers(Matcher):
         pass
     
     def Matches(self, atom):
-        return 'path' in atom.properties and atom.path == '/obj/effect/byondtools/changed'
+        return atom.path == '/obj/effect/byondtools/changed'
     
     def Fix(self, atom):
         return None
     
     def __str__(self):
-        return 'Removed tag'
+        return 'Removed change marker'
     
 class RenameProperty(Matcher):
     '''

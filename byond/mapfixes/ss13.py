@@ -21,7 +21,7 @@ class StandardizeAPCs(Matcher):
                 if setting not in ('name', 'pixel_x', 'pixel_y', 'tag', 'dir'):
                     nonstandard_settings += [setting]
             if len(nonstandard_settings) > 0:
-                print('Non-standard APC #{}: Has strange settings - {}'.format(atom.id,', '.join(nonstandard_settings)))
+                print('Non-standard APC #{}: Has strange settings - {}'.format(atom.ID,', '.join(nonstandard_settings)))
             else:
                 if 'name' in atom.properties and 'name' in atom.mapSpecified:
                     self.actions |= self.ACT_CLEAR_NAME
