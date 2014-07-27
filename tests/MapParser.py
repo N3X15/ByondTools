@@ -7,8 +7,8 @@ import unittest
 
 class MapParserTest(unittest.TestCase):
     def setUp(self):
-        from byond.map import Map, Tile
-        self.dmm = Map()
+        from byond.map.format.dmm import DMMFormat
+        self.dmm = DMMFormat()
     
     def test_basic_SplitAtoms_operation(self):
         testStr = '/obj/effect/landmark{name = "carpspawn"},/obj/structure/lattice,/turf/space,/area'
@@ -44,7 +44,7 @@ class MapParserTest(unittest.TestCase):
         )
         '''
         testStr = '"aaK" = (/obj/structure/cable{d1 = 1; d2 = 2; icon_state = "1-2"; tag = ""},/obj/machinery/atmospherics/pipe/simple/supply/hidden{dir = 4},/turf/simulated/floor{icon_state = "floorgrime"},/area/security/prison)'
-        out = self.dmm.consumeTile(testStr, 0)
+        out = self.dmm.consumeTile(testStr, 0, False) # :type out: Tile
         print('IIDs: {0}'.format(repr(out.instances)))
 
         self.assertEquals(out.origID, 'aaK', 'origID')
@@ -59,7 +59,6 @@ class MapParserTest(unittest.TestCase):
         self.assertEqual(out.MapSerialize(Tile.FLAG_USE_OLD_ID), testStr)
         
     def test_consumeTile_landmark(self):
-        from byond.map import Map, Tile
         testStr='"aah" = (/obj/effect/landmark{name = "carpspawn"},/obj/structure/lattice,/turf/space,/area)'
         out = self.dmm.consumeTile(testStr, 0)
         self.assertEqual(out.MapSerialize(Tile.FLAG_USE_OLD_ID), testStr)

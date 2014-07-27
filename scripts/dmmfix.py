@@ -80,22 +80,26 @@ for fixscript in args.fixscripts:
         if errors > 0:
             print('!!! {0} errors, please fix them.'.format(errors))
             sys.exit(1)
-print('Changes to make:')
-for action in actions:
-    print(' * ' + str(action))
 dmm = Map(tree, forgiving_atom_lookups=1)
 dmm.Load(args.map)
 #dmm.Load(args.map.replace('.dmm', '.dmm2'))
+print('Changes to make:')
+for action in actions:
+    print(' * ' + str(action))
+print('Iterating tiles...')
 warudo = dmm.Tiles()
 for tile in warudo:
+    if tile is None: continue
     for atom in tile.GetAtoms():
         changes = []
         tile.RemoveAtom(atom)
+        atomInfo='{0} (#{1}):'.format(atom.path, atom.ID)
         for action in actions:
             action.SetTree(tree)
             if action.Matches(atom):
                 atom = action.Fix(atom)
                 changes += [str(action)]
+                if atom is None: break
         
         '''
         compiled_atom = tree.GetAtom(atom.path)
@@ -108,7 +112,7 @@ for tile in warudo:
                     changes += ['Dropped property {0} (not found in compiled atom)'.format(propname)]
         '''
         if len(changes) > 0:
-            print('{0} (#{1}):'.format(atom.path, atom.id))
+            print(atomInfo if atom is not None else '{} (DELETED)'.format(atomInfo))
             for change in changes:
                 print(' * ' + change)
         if atom is not None:

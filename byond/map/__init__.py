@@ -148,7 +148,10 @@ class Tile(object):
     def UpdateHash(self, no_map_update=False):
         if self._hash is None:
             self._hash = hashlib.md5(str(self)).hexdigest()
-            if not no_map_update: self.map.UpdateTile(self)
+            if not no_map_update: 
+                self.ID=self.map.UpdateTile(self)
+                if self.ID==-1:
+                    raise Error('self.ID == -1')
             
     def InvalidateHash(self):
         if self._hash is not None:
@@ -398,17 +401,20 @@ class MapLayer:
         :param tile Tile:
         '''
         
+        '''
         if not self.initial_load:
             # Remove old tile.
             oldid = self.tiles[x, y]
             if oldid < len(self.map.instances):
                 t = self.map.tiles[oldid]
                 if t: t.rmLocation((x, y, self.z))
+        '''
         
         # Set new tile.
-        if not self.initial_load: self.map.UpdateTile(tile)
+        if not self.initial_load: 
+            tile.ID=self.map.UpdateTile(tile)
         self.tiles[x, y] = tile.ID
-        self.map.tiles[tile.ID].addLocation((x, y, self.z))
+        #self.map.tiles[tile.ID].addLocation((x, y, self.z))
     
     def SetTileID(self, x, y, newID):
         '''
@@ -423,7 +429,19 @@ class MapLayer:
         if t is None:
             raise KeyError('Unknown tile #{}'.format(newID))
 
-        self.SetTile(x, y, t)
+        #self.SetTile(x, y, t)
+        
+        '''
+        if not self.initial_load:
+            # Remove old tile.
+            oldid = self.tiles[x, y]
+            if oldid < len(self.map.instances):
+                t = self.map.tiles[oldid]
+                if t: t.rmLocation((x, y, self.z))
+        '''
+       
+        self.tiles[x, y] = newID
+        #self.map.tiles[newID].addLocation((x, y, self.z))
         
     def Resize(self, height, width):
         self.height = height
@@ -490,32 +508,40 @@ class Map:
         '''
         Update tile registry.
         
-        :param t Tile: Tile to update.
+        :param t Tile:
+            Tile to update.
+        :return Tile ID:
         '''
         thash = t.GetHash()
 
         # if t.ID >= 0 and t.ID < len(self.tiles) and self.tiles[t.ID] is not None:
         #    self.tiles[t.ID].rmLocation(t.coords)
-            
+           
         tiles_action = "-"
+        '''
         if t in self.tiles:
             t.ID = self.tiles.index(t)
         else:
-            t.ID = len(self.tiles)
-            self.tiles += [t.copy()]
-            tiles_action = "Added"
+        '''
             
         idmap_action = "-"
         if thash not in self._tile_idmap:
-            self._tile_idmap[thash] = t.ID
             idmap_action = "Added"
+            
+            t.ID = len(self.tiles)
+            self.tiles += [t.copy()]
+            self._tile_idmap[thash] = t.ID
+            tiles_action = "Added"
+            #print('Assigned ID #{} to tile {}'.format(t.ID,thash))
         elif self._tile_idmap[thash] != t.ID:
             t.ID = self._tile_idmap[thash]
             idmap_action = "Updated"
+            #print('Updated tile {1} to ID #{0}'.format(t.ID,thash))
             
-        if t.origID == "aaa": print('Updated #{} - Tiles: {}, idmap: {}'.format(t.ID, tiles_action, idmap_action))
+        #print('Updated #{} - Tiles: {}, idmap: {}'.format(t.ID, thash, tiles_action, idmap_action))
             
         self.tiles[t.ID].addLocation(t.coords)
+        return t.ID
         
     def UpdateAtom(self, a):
         '''
@@ -529,18 +555,15 @@ class Map:
             self.instances[a.ID].rmLocation(self, a.coords)
             
         if thash not in self._instance_idmap:
-            if None in self.instances:
-                a.ID = self.instances.index(None)
-                self.instances[a.ID] = a.copy()
-                # self.instances[a.ID].master=True
-            else:
-                a.ID = len(self.instances)
-                self.instances += [a.copy()]
+            a.ID = len(self.instances)
+            self.instances += [a.copy()]
             self._instance_idmap[thash] = a.ID
+            #print('Assigned ID #{} to atom {}'.format(a.ID,thash))
         else:
             a.ID = self._instance_idmap[thash]
         if a.coords is not None:
             self.instances[a.ID].addLocation(a.coords)
+        return a.ID
         
     def CreateZLevel(self, height, width, z= -1):
         zLevel = MapLayer(z if z >= 0 else len(self.zLevels), self, height, width)

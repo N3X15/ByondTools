@@ -25,7 +25,7 @@ THE SOFTWARE.
 """
 import sys, argparse, os, re
 from byond import ObjectTree, Map, MapRenderFlags
-from byond.basetypes import Atom
+from byond.basetypes import Atom, PropertyFlags
 from byond.map.format.dmm import DMMFormat
 
 def main():
@@ -43,7 +43,7 @@ def main():
     _patch = command.add_parser('patch', help='Apply a map patch.')
     _patch.add_argument('-O', '--output', dest='output', type=str, help='Where to place the patched map. (Default is to overwrite input map)', metavar='mine.dmdiff', nargs='?')
     _patch.add_argument('--clobber', dest='clobber', action="store_true", help='Overwrite conflicts')
-    _patch.add_argument('patch', type=str, help='Patch to apply.', metavar='patch.dmmpatch')
+    _patch.add_argument('patches', action='append', nargs='+', help='Patch(es) to apply.', metavar='patch.dmmpatch')
     _patch.add_argument('map', type=str, help='The map to change.', metavar='map.dmm')
     
     _analyze = command.add_parser('analyze', help='Generate a report of each atom on a map.  WARNING: huge')
@@ -60,9 +60,12 @@ def main():
         print('!!! Error, unknown MODE=%r' % args.MODE)
 
 def patch_dmm(args):
-    if not os.path.isfile(args.patch):
-        print('File {0} does not exist.'.format(args.theirs))
-        sys.exit(1)
+    print(repr(args.patches))
+    for i in range(len(args.patches[0])):
+        patch=args.patches[0][i]
+        if not os.path.isfile(patch):
+            print('File {0} does not exist.'.format(patch))
+            sys.exit(1)
     if not os.path.isfile(args.map):
         print('File {0} does not exist.'.format(args.mine))
         sys.exit(1)
@@ -79,7 +82,12 @@ def patch_dmm(args):
     added = 0
     removed = 0
     
-    changemarker=Atom('/obj/effect/byondtools/changed')
+    currentpatch = ''
+    
+    def changeMarker(ln):
+        a = Atom('/obj/effect/byondtools/changed')
+        a.setProperty('tag','{}:{}'.format(currentpatch,ln),flags=PropertyFlags.MAP_SPECIFIED)
+        return a
     
     def printReport(context, added, removed):
         if context is not None:
@@ -87,96 +95,101 @@ def patch_dmm(args):
             print(' Z={} +{} -{}'.format(z, added, removed))
     
     REG_INSTRUCTION = re.compile(r'^(?P<change>[\+\-])(?P<amount>[0-9\*]+)?\s+(?P<atom>/.*)')
-    with open(args.patch) as f:
-        ln = 0
-        lz = -1
-        skip_block = False
-        for line in f:
-            ln += 1
-            line = line.strip()
-            if line == '': continue
-            if line.startswith('#'): continue
-            if line.startswith('<') and line.endswith('>'):
-                strcoords = line.strip('<>').split(',')
-                newcoords = []
-                for coord in strcoords:
-                    newcoords += [int(coord)]
-                if context is not None and lz != context[2]:
-                    printReport(context, added, removed)
-                    lz = context[2]
-                    added = removed = 0
-                context = newcoords
-                skip_block = False
-                continue
-            if line.startswith('@') and not skip_block:
-                # @CHECK before-hash after-hash atoms-block
-
-                x, y, z = context
-                
-                if line.startswith('@CHECK'):
-                    _, beforehash, afterhash, serdata = line.split(' ', 3)
-                    
-                    if args.clobber:
-                        print('WARNING: <{},{},{}> has changed and will be overwritten. (--clobber)'.format(x, y, z))
-                        t=fmt.consumeTileChunk(serdata, cache=False)
-                        t.AppendAtom(changemarker)
-                        dmm.SetTileAt(x, y, z, t)
-                        skip_block = True
-                        continue
-                    curhash = dmm.GetTileAt(x, y, z).GetHash()
-                    if afterhash == curhash:
-                        print('Skipping <{},{},{}> (already what we expected)'.format(x, y, z))
-                        skip_block = True
-                        continue
-                    #else: print('PRE {} != {}: OK'.format(curhash,afterhash))
-                    if beforehash != curhash:
-                        print('WARNING: <{},{},{}> has changed.  Operations on this tile may not be accurate!'.format(x, y, z))
-                        continue
-                    #else: print('OLD {} == {}: OK'.format(curhash,beforehash))
-                          
-            if not skip_block and (line.startswith('+') or line.startswith('-')):
-                if line == '-ALL':
-                    dmm.SetTileAt(x, y, z, dmm.CreateTile())
+    
+    for i in range(len(args.patches[0])):
+        patch=args.patches[0][i]
+        print('* Applying {}...'.format(patch))
+        currentpatch=patch
+        with open(patch) as f:
+            ln = 0
+            lz = -1
+            skip_block = False
+            for line in f:
+                ln += 1
+                line = line.strip()
+                if line == '': continue
+                if line.startswith('#'): continue
+                if line.startswith('<') and line.endswith('>'):
+                    strcoords = line.strip('<>').split(',')
+                    newcoords = []
+                    for coord in strcoords:
+                        newcoords += [int(coord)]
+                    if context is not None and lz != context[2]:
+                        printReport(context, added, removed)
+                        lz = context[2]
+                        added = removed = 0
+                    context = newcoords
+                    skip_block = False
                     continue
-                m = REG_INSTRUCTION.match(line)
-                if m is None:
-                    print('{}:{}: MALFORMED INSTRUCTION: {}'.format(args.patch, ln, line))
-                    sys.exit(1)
-                amount = m.group('amount')
-                if amount == '*':
-                    amount = 9999
-                else:
-                    amount = int(m.group('amount') or 1)
-                change = m.group('change')
-                
-                atom = fmt.consumeAtom(m.group('atom'), ln)
-                atom.filename = args.patch
-                atom.line = ln
-                if atom is None:
-                    print('{}:{}: WARNING: Unable to parse instance specified by chunk {}'.format(args.patch, ln, m.group('atom')))
-                    continue
-
-                x, y, z = context
-                if x == 0 and y == 0 and z == 0:
-                    print('WE AT <0,0,0> SOMEFIN WRONG')
+                if line.startswith('@') and not skip_block:
+                    # @CHECK before-hash after-hash atoms-block
+    
+                    x, y, z = context
                     
-                if z >= len(dmm.zLevels): continue
-                
-                tile = dmm.GetTileAt(x, y, z)
-                if change == '-':
-                    for _ in range(amount):
-                        if tile.CountAtom(atom) > 0:
-                            tile.RemoveAtom(atom, hash=False)
-                            removed += 1
-                        else: break
-                elif change == '+':
-                    for _ in range(amount):
-                        tile.AppendAtom(atom, hash=False)
-                    added += amount
-                tile.UpdateHash()
-                # dmm.SetTileAt(x, y, z, tile)
-                # print('{} - {}'.format((x,y,z),tile))
-        printReport(context, added, removed)
+                    if line.startswith('@CHECK'):
+                        _, beforehash, afterhash, serdata = line.split(' ', 3)
+                        
+                        if args.clobber:
+                            #print('WARNING: <{},{},{}> has changed and will be overwritten. (--clobber)'.format(x, y, z))
+                            t=fmt.consumeTileChunk(serdata, cache=False)
+                            t.AppendAtom(changeMarker(ln))
+                            dmm.SetTileAt(x, y, z, t)
+                            skip_block = True
+                            continue
+                        curhash = dmm.GetTileAt(x, y, z).GetHash()
+                        if afterhash == curhash:
+                            print('Skipping <{},{},{}> (already what we expected)'.format(x, y, z))
+                            skip_block = True
+                            continue
+                        #else: print('PRE {} != {}: OK'.format(curhash,afterhash))
+                        if beforehash != curhash:
+                            print('WARNING: <{},{},{}> has changed.  Operations on this tile may not be accurate!'.format(x, y, z))
+                            continue
+                        #else: print('OLD {} == {}: OK'.format(curhash,beforehash))
+                              
+                if not skip_block and (line.startswith('+') or line.startswith('-')):
+                    if line == '-ALL':
+                        dmm.SetTileAt(x, y, z, dmm.CreateTile())
+                        continue
+                    m = REG_INSTRUCTION.match(line)
+                    if m is None:
+                        print('{}:{}: MALFORMED INSTRUCTION: {}'.format(args.patch, ln, line))
+                        sys.exit(1)
+                    amount = m.group('amount')
+                    if amount == '*':
+                        amount = 9999
+                    else:
+                        amount = int(m.group('amount') or 1)
+                    change = m.group('change')
+                    
+                    atom = fmt.consumeAtom(m.group('atom'), ln)
+                    atom.filename = args.patch
+                    atom.line = ln
+                    if atom is None:
+                        print('{}:{}: WARNING: Unable to parse instance specified by chunk {}'.format(args.patch, ln, m.group('atom')))
+                        continue
+    
+                    x, y, z = context
+                    if x == 0 and y == 0 and z == 0:
+                        print('WE AT <0,0,0> SOMEFIN WRONG')
+                        
+                    if z >= len(dmm.zLevels): continue
+                    
+                    tile = dmm.GetTileAt(x, y, z)
+                    if change == '-':
+                        for _ in range(amount):
+                            if tile.CountAtom(atom) > 0:
+                                tile.RemoveAtom(atom, hash=False)
+                                removed += 1
+                            else: break
+                    elif change == '+':
+                        for _ in range(amount):
+                            tile.AppendAtom(atom, hash=False)
+                        added += amount
+                    tile.UpdateHash()
+                    # dmm.SetTileAt(x, y, z, tile)
+                    # print('{} - {}'.format((x,y,z),tile))
+            printReport(context, added, removed)
     
     print('Saving...')
     dmm.Save(args.output if args.output else args.map)
@@ -201,7 +214,7 @@ def compare_dmm(args):
     ttitle, _ = os.path.splitext(os.path.basename(args.theirs))
     mtitle, _ = os.path.splitext(os.path.basename(args.mine))
     
-    format = DMMFormat(None)
+    format = DMMFormat(theirs_dmm)
     
     output = '{} - {}.dmmpatch'.format(ttitle, mtitle)
     
@@ -368,9 +381,9 @@ def analyze_dmm(args):
     for atom in dmm.instances:
         if atom.path not in instance_info:
             instance_info[atom.path] = []
-        instance_info[atom.path] += [atom.id]
+        instance_info[atom.path] += [atom.ID]
         
-        with open(os.path.join(basedir, 'instances', str(atom.id) + '.html'), 'w') as f:
+        with open(os.path.join(basedir, 'instances', str(atom.ID) + '.html'), 'w') as f:
             body = '<h2>Atom Data:</h2><table class="prettytable"><thead><tr><th>Name</th><th>Value</th></tr></thead><tbody>'
             for attr in presentable_attributes: 
                 body += '<tr><th>{0}</th><td>{1}</td></tr>'.format(attr, getattr(atom, attr, None))
@@ -386,7 +399,7 @@ def analyze_dmm(args):
                 attr = atom.properties[attr_name]
                 body += '<tr><th>{0}</th><td>{1}</td><td>{2}:{3}</td></tr>'.format(attr_name, attr.value, attr.filename, attr.line)
             body += '</tbody></table>'
-            f.write(MakePage(title='Instance #{0}'.format(atom.id), depth=1, body=body))
+            f.write(MakePage(title='Instance #{0}'.format(atom.ID), depth=1, body=body))
     with open(os.path.join(basedir, 'instances', 'index.html'), 'w') as idx:
         body = '<ul>'
         for atype, instances in instance_info.items():
@@ -395,7 +408,7 @@ def analyze_dmm(args):
                 body += '<li><a href="{{ROOT}}/instances/{0}.html">#{0}</a></li>'.format(iid)
             body += '</ul></li>'
         body += "</ul>"
-        idx.write(MakePage(title='Instance Index'.format(atom.id), depth=1, body=body))
+        idx.write(MakePage(title='Instance Index'.format(atom.ID), depth=1, body=body))
         
     # Tiles
     with open(os.path.join(basedir, 'index.html'), 'w') as f:
@@ -403,7 +416,7 @@ def analyze_dmm(args):
         for tile in dmm.tileTypes:
             body += '<tr><td><img src="tiles/{0}.png" height="96" width="96" /></td><th>{0}</th><td><ul>'.format(tile.ID)
             for atom in tile.SortAtoms():
-                body += '<li><a href="{{ROOT}}/instances/{0}.html">#{0}</a> - {1}</li>'.format(atom.id, atom.path)
+                body += '<li><a href="{{ROOT}}/instances/{0}.html">#{0}</a> - {1}</li>'.format(atom.ID, atom.path)
             body += '</ul></td></tr>'
             img = tile.RenderToMapTile(0, os.path.dirname(sys.argv[1]), MapRenderFlags.RENDER_STARS)
             if img is None: continue
@@ -412,7 +425,7 @@ def analyze_dmm(args):
                 img.paste(pass_2, (0, 0, 96, 96), pass_2)
             img.save(os.path.join(basedir, 'tiles', '{0}.png'.format(tile.ID)), 'PNG')
         body += '</tbody></table>'
-        f.write(MakePage(title='Tile Index'.format(atom.id), depth=0, body=body))
+        f.write(MakePage(title='Tile Index'.format(atom.ID), depth=0, body=body))
             
 if __name__ == '__main__':
     main()

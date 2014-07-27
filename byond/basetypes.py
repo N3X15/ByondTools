@@ -226,6 +226,7 @@ class Atom:
         
         # : Used for masters to track instance locations.
         self.locations = []
+        
     def rmLocation(self, map, coord, autoclean=True):
         if coord in self.locations:
             self.locations.remove(coord)

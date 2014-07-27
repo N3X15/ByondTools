@@ -1,5 +1,5 @@
 from byond.basetypes import *
-from byond.utils import getElapsed
+from byond.utils import getElapsed, do_profile
 # from byond.map import Tile, MapLayer
 from byond.map.format.base import BaseMapFormat, MapFormat
 import os, sys, logging, itertools, shutil, collections, math
@@ -92,10 +92,13 @@ class DMMFormat(BaseMapFormat):
         inZLevel = False
         width = 0
         height = 0
+        ln=0
         while True:
+            ln += 1
             line = f.readline()
             if line == '':
                 return
+            dbg_p="{}:{}: ".format(self.filename,ln)
             # (1,1,1) = {"
             if line.startswith('('):
                 coordChunk = line[1:line.index(')')].split(',')
@@ -107,6 +110,7 @@ class DMMFormat(BaseMapFormat):
                 height = 0
                 
                 start = clock()
+                print(dbg_p+' START z={}'.format(z))
                 continue
             if line.strip() == '"}':
                 zLevel.initial_load=False
@@ -115,16 +119,16 @@ class DMMFormat(BaseMapFormat):
                     height = y
                 # self.map.zLevels[z] = zLevel
                 zLevel = None
-                # self.log.info('Added map layer {0} ({1}x{2})'.format(z, height, width))
                 print(' * Added map layer {0} ({1}x{2}, {3})'.format(z, height, width, getElapsed(start)))
                 continue
             if inZLevel:
                 if zLevel is None:
                     zLevel = self.map.CreateZLevel(height, width)  # , z-1)
                     zLevel.initial_load=True
+                    print(dbg_p+' CREATED z={}'.format(z))
                 if width == 0:
                     width = len(line) / self.idlen
-                    # print('Width detected as {}.'.format(width))
+                    #print('Width detected as {}.'.format(width))
                     zLevel.Resize(width, width)
                 if width > 255:
                     logging.warn("Line is {} blocks long!".format(width))
@@ -133,7 +137,7 @@ class DMMFormat(BaseMapFormat):
                     chunk = ''.join(chunk)
                     tid = self.oldID2NewID[chunk]
                     #if tid == 1:
-                    #    print('[{},{}] Chunk: {}, tid: {}'.format(x,y,chunk,tid))
+                    #print('[{},{}] Chunk: {}, tid: {}'.format(x,y,chunk,tid))
                     zLevel.SetTileID(x, y, tid)
                     x += 1
                 y += 1
@@ -149,14 +153,15 @@ class DMMFormat(BaseMapFormat):
             if line.startswith('"'):
                 t = self.consumeTile(line, lineNumber)
                 #t.ID = index
+                t.map = self.map
                 t.UpdateHash()
-                #print('Loaded tile #{} ({})'.format(t.ID,t._hash))
                 self.tileTypes += [t]
-                self.idlen = max(self.idlen, len(self.ID2String(t.ID)))
+                self.idlen = max(self.idlen, len(t.origID))
                 if t.origID=='':
                     print('{}:{}: ERROR: Unable to determine origID.'.format(self.filename,lineNumber))
                     sys.exit(1)
-                if t.origID == 'aaa': print('aaa = {}'.format(t.ID))
+                print('Loaded tile #{} ({})'.format(t.ID,t.origID))
+                #if t.origID == 'aaa': print('aaa = {}'.format(t.ID))
                 self.oldID2NewID[t.origID] = t.ID
                 self.tileChunk2ID[self.SerializeTile(t)] = t.ID
                 index += 1
@@ -176,7 +181,7 @@ class DMMFormat(BaseMapFormat):
                 instances += [self.atomCache[atom_chunk]]
             else:
                 atom = self.consumeAtom(atom_chunk, lineNumber)
-                self.map.UpdateAtom(atom)
+                atom.ID = self.map.UpdateAtom(atom)
                 self.atomCache[atom_chunk] = atom
                 instances += [atom]
             
@@ -334,10 +339,11 @@ class DMMFormat(BaseMapFormat):
                 self.oldID2NewID[origID] = parentID
                 self.duplicates += 1
                 return self.tileTypes[parentID]
-            
         if origID is not None:
             t.origID = origID
         t.instances = self.consumeTileAtoms(tileChunk, lineNumber)
+        t.ID=self.map.UpdateTile(t)
+        self.tileChunk2ID[tileChunk]=t.ID
         return t
     
     def consumeTileID(self, line):

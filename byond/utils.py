@@ -30,6 +30,32 @@ def eval_expr(expr):
 def getElapsed(start):
     return '%d:%02d:%02d.%03d' % reduce(lambda ll, b : divmod(ll[0], b) + ll[1:], [((clock() - start) * 1000,), 1000, 60, 60])
 
+class ProfilingTarget:
+    def __init__(self,name):
+        self.name=name
+        self.calls=0
+        self.elapsed=0
+        self.start_time=0
+        
+    def start(self):
+        start_time = clock()
+        
+    def end(self):
+        el = clock() - self.start_time
+        calls += 1
+        elapsed += el
+        return el
+    
+    def __str__(self):
+        return "{} - C: {}, E: {}, A: {}".format(self.name,self.calls,getElapsed(self.elapsed),getElapsed(self.elapsed/self.calls))
+    
+    def ToCSV(self):
+        return "{},{},{},{}".format(self.name,self.calls,getElapsed(self.elapsed),getElapsed(self.elapsed/self.calls))
+    
+class Profiler:
+    def __init__(self):
+        self.targets={}
+
 def eval_(node):
     if isinstance(node, ast.Num):  # <number>
         return node.n
@@ -50,3 +76,31 @@ def get_stdlib(path=''):
     if path != '':
         return os.path.join(get_data('stdlib'), path)
     return get_data('stdlib')
+
+
+try:
+    from line_profiler import LineProfiler
+
+    def do_profile(follow=[]):
+        def inner(func):
+            def profiled_func(*args, **kwargs):
+                try:
+                    profiler = LineProfiler()
+                    profiler.add_function(func)
+                    for f in follow:
+                        profiler.add_function(f)
+                    profiler.enable_by_count()
+                    return func(*args, **kwargs)
+                finally:
+                    profiler.print_stats()
+            return profiled_func
+        return inner
+
+except ImportError:
+    def do_profile(follow=[]):
+        "Helpful if you accidentally leave in production!"
+        def inner(func):
+            def nothing(*args, **kwargs):
+                return func(*args, **kwargs)
+            return nothing
+        return inner
