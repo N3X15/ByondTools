@@ -24,6 +24,21 @@ Use
 
 Initial documentation is taking shape at http://ss13.nexisonline.net/wiki/User:N3X15/Guide_to_BYONDTools
 
+API Status
+----------
+
++---------------+--------+
+| API Component | State  |
++---------------+--------+
+| DMI           | Stable |
++---------------+--------+
+| Maps          | BROKEN |
++---------------+--------+
+| Object Tree   | Stable |
++---------------+--------+
+| Scripting     | WIP    |
++---------------+--------+
+
 Support
 -------
 
