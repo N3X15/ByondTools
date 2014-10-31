@@ -193,7 +193,7 @@ class ObjectTree:
                         if c == '"':
                             inString = not inString
                             if not inString:
-                                filepath = os.path.join(rootdir, filename.replace('\\',os.sep))
+                                filepath = os.path.join(rootdir, filename.replace('\\', os.sep))
                                 if filepath.endswith(ext):
                                     ToRead += [filepath]
                                 filename = ''
@@ -623,6 +623,8 @@ class ObjectTree:
                 
             if name.endswith(']'):
                 name = name[:name.index('[')]
+                if size is None:
+                    size = -1
                 
             if 'list' not in pathchunks and size is not None:
                 pathchunks = ['list'] + pathchunks

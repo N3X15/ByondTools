@@ -39,7 +39,7 @@ class ObjectTreeTests(unittest.TestCase):
         
         self.assertEqual(name,       'medical')
         self.assertEqual(data.type,  '/list')
-        self.assertEqual(data.value, None)
+        self.assertEqual(data.value, 'list()')
         self.assertEqual(data.size,  -1)
         self.assertEqual(data.declaration, True)
         self.assertEqual(data.inherited, False)

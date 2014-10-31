@@ -54,7 +54,7 @@ def BYOND2RGBA(colorstring, alpha=255):
 for name, color in COLORS.items():
     _COLOR_LOOKUP[name] = BYOND2RGBA(color)
     
-import re, hashlib
+import re, hashlib, collections
 from .utils import eval_expr
 REGEX_TABS = re.compile('^(?P<tabs>\t*)') 
 class BYONDValue:
@@ -187,7 +187,7 @@ class Atom:
         self.path = path
         
         # : Vars of this atom, including inherited vars.
-        self.properties = {}
+        self.properties = collections.OrderedDict()
         
         # : List of var names that were specified by the map, if atom was loaded from a :class:`byond.map.Map`.
         self.mapSpecified = []

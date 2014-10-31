@@ -246,7 +246,7 @@ class Tile(object):
         #    return all(self.instances[i] == other.instances[i] for i in xrange(len(self.instances)))
     
     def _serialize(self):
-        return ','.join([str(i) for i in self.GetInstances()])
+        return ','.join([str(i) for i in self.GetAtoms()])
         
     def RenderToMapTile(self, passnum, basedir, renderflags, **kwargs):
         img = Image.new('RGBA', (96, 96))
