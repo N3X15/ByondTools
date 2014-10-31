@@ -8,7 +8,9 @@ import unittest
 class MapParserTest(unittest.TestCase):
     def setUp(self):
         from byond.map.format.dmm import DMMFormat
-        self.dmm = DMMFormat()
+        from byond.map import Map
+        self.map = Map()
+        self.dmm = DMMFormat(self.map)
     
     def test_basic_SplitAtoms_operation(self):
         testStr = '/obj/effect/landmark{name = "carpspawn"},/obj/structure/lattice,/turf/space,/area'

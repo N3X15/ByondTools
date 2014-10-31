@@ -17,8 +17,8 @@ class AtomTest(unittest.TestCase):
         
         atom2=atom.copy()
         
-        atom_serialized=atom.MapSerialize()
-        atom2_serialized=atom2.MapSerialize()
+        atom_serialized=atom.dumpPropInfo('test')
+        atom2_serialized=atom2.dumpPropInfo('test')
         
         self.assertEqual(atom_serialized, atom2_serialized)
 

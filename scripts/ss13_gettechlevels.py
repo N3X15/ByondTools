@@ -47,7 +47,7 @@ def ProcessTechLevels(atom, path=''):
             tech_origin = {}
             # materials=9;bluespace=10;magnets=3
             text_origin_tech = atom.getProperty('origin_tech', 'null')
-            if text_origin_tech == 'null' or text_origin_tech == '':
+            if text_origin_tech == 'null' or text_origin_tech == '' or text_origin_tech is None:
                 continue
             techchunks = text_origin_tech.split(';')
             for techchunk in techchunks:
