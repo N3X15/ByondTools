@@ -620,6 +620,10 @@ class ObjectTree:
             if pathchunks[0] in ('tmp', 'global', 'const'):
                 special = pathchunks[0]
                 pathchunks = pathchunks[1:]
+                
+            if name.endswith(']'):
+                name = name[:name.index('[')]
+                
             if 'list' not in pathchunks and size is not None:
                 pathchunks = ['list'] + pathchunks
             typepath = '/' + '/'.join(pathchunks[:-1])

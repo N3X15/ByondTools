@@ -46,6 +46,7 @@ class MapParserTest(unittest.TestCase):
         )
         '''
         testStr = '"aaK" = (/obj/structure/cable{d1 = 1; d2 = 2; icon_state = "1-2"; tag = ""},/obj/machinery/atmospherics/pipe/simple/supply/hidden{dir = 4},/turf/simulated/floor{icon_state = "floorgrime"},/area/security/prison)'
+        testSerData='/obj/structure/cable{d1 = 1; d2 = 2; icon_state = "1-2"; tag = ""},/obj/machinery/atmospherics/pipe/simple/supply/hidden{dir = 4},/turf/simulated/floor{icon_state = "floorgrime"},/area/security/prison'
         out = self.dmm.consumeTile(testStr, 0, False) # :type out: Tile
         print('IIDs: {0}'.format(repr(out.instances)))
 
@@ -58,12 +59,14 @@ class MapParserTest(unittest.TestCase):
         self.assertEquals(len(out.GetAtom(2).properties), 1, 'Failure to parse /turf/simulated/floor{icon_state = "floorgrime"}')
         self.assertIn('icon_state', out.GetAtom(2).properties, 'Failure to parse /turf/simulated/floor{icon_state = "floorgrime"}')
         
-        self.assertEqual(out.MapSerialize(Tile.FLAG_USE_OLD_ID), testStr)
+        # :type out: byond.map.Tile
+        self.assertEqual(out._serialize(), testSerData)
         
     def test_consumeTile_landmark(self):
         testStr='"aah" = (/obj/effect/landmark{name = "carpspawn"},/obj/structure/lattice,/turf/space,/area)'
+        testSerData='/obj/effect/landmark{name = "carpspawn"},/obj/structure/lattice,/turf/space,/area'
         out = self.dmm.consumeTile(testStr, 0)
-        self.assertEqual(out.MapSerialize(Tile.FLAG_USE_OLD_ID), testStr)
+        self.assertEqual(out._serialize(), testStr)
 
 
 if __name__ == "__main__":
