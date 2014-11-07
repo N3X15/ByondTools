@@ -825,7 +825,7 @@ class Map:
                 logging.warn('{} is mode {}!'.format(dmi_file, dmi.img.mode))
                 
             if direction not in IMAGE_INDICES:
-                logging.warn('Unrecognized direction {} on atom {}!'.format(direction, atom.MapSerialize()))
+                logging.warn('Unrecognized direction {} on atom {}!'.format(direction, str(atom)))
                 direction = SOUTH  # DreamMaker property editor shows dir = 2.  WTF?
                 
             frame = dmi.getFrame(state, direction, 0)
@@ -865,7 +865,7 @@ class Map:
         each atom on it after sorting layers.  This resolves the pixel_(x,y) problem.
         '''
         if z is None:
-            for z in self.zLevels.keys():
+            for z in range(len(self.zLevels)):
                 self.generateImage(filename_tpl, basedir, renderflags, z, **kwargs)
             return
         self.selectedAreas = ()
@@ -882,7 +882,7 @@ class Map:
         instancePositions = {}
         for y in range(self.zLevels[z].height):
             for x in range(self.zLevels[z].width):
-                t = self.zLevels[z].GetTileAt(x, y)
+                t = self.zLevels[z].GetTile(x, y)
                 # print('*** {},{}'.format(x,y))
                 if t is None:
                     continue
@@ -939,7 +939,7 @@ class Map:
         
         levelAtoms = []
         for iid in instancePositions:
-            levelAtoms += [self.getInstance(iid)]
+            levelAtoms += [self.GetInstance(iid)]
         
         pic = Image.new('RGBA', ((self.zLevels[z].width + 2) * 32, (self.zLevels[z].height + 2) * 32), "black")
             

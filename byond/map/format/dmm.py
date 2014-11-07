@@ -160,7 +160,7 @@ class DMMFormat(BaseMapFormat):
                 if t.origID=='':
                     print('{}:{}: ERROR: Unable to determine origID.'.format(self.filename,lineNumber))
                     sys.exit(1)
-                print('Loaded tile #{} ({})'.format(t.ID,t.origID))
+                #print('Loaded tile #{} ({})'.format(t.ID,t.origID))
                 #if t.origID == 'aaa': print('aaa = {}'.format(t.ID))
                 self.oldID2NewID[t.origID] = t.ID
                 self.tileChunk2ID[self.SerializeTile(t)] = t.ID

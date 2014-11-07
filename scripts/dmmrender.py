@@ -68,7 +68,7 @@ if os.path.isfile(args.project):
     tree = ObjectTree()
     tree.ProcessFilesFromDME(args.project)
     dmm = Map(tree)
-    dmm.readMap(args.map)
+    dmm.Load(args.map)
     renderflags = 0
     if args.render_stars:
         renderflags |= MapRenderFlags.RENDER_STARS

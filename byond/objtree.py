@@ -2,6 +2,7 @@
 Superficially generate an object/property tree.
 '''
 import re, logging, os
+import sre_constants
 
 try:
     import cPickle as pickle
@@ -21,7 +22,7 @@ def debug(filename, line, path, message):
     print('{0}:{1}: {2} - {3}'.format(filename, line, '/'.join(path), message))
     
 class OTRCache:
-    # : Only used for obliterating outdated data.
+    #: Only used for obliterating outdated data.
     VERSION = [18, 6, 2014]
     
     def __init__(self, filename):
@@ -470,6 +471,11 @@ class ObjectTree:
                         elif len(defineChunks) == 3:
                             defineChunks[2] = self.PreprocessLine(defineChunks[2])
                         # print(repr(defineChunks))
+                        
+                        # TODO: We don't know how to handle parameterized macros yet.
+                        if '(' in defineChunks[1]:
+                            continue
+                        
                         try:
                             if '.' in defineChunks[2]:
                                 self.defines[defineChunks[1]] = BYONDValue(float(defineChunks[2]), filename, ln)
@@ -711,7 +717,11 @@ class ObjectTree:
         for key, define in self.defines.items():
             if key in line:
                 if key not in self.defineMatchers:
-                    self.defineMatchers[key] = re.compile(r'\b' + key + r'\b')
+                    try:
+                        self.defineMatchers[key] = re.compile(r'\b' + key + r'\b')
+                    except sre_constants.error:
+                        print('!!! Unable to compile regex for {}!'.format(key))
+                        continue
                 newline = self.defineMatchers[key].sub(str(define.value), line)
                 if newline != line:
                     '''
