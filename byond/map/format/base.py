@@ -16,7 +16,7 @@ class MapFormat(object):
         return c
     
 def GetMapFormat(_map,ext):
-    f = MapFormat.all.get(ext.lstrip('.'),None)
+    f = MapFormat.all.get(ext.strip('.'),None)
     if f is None:
         print('Unable to find MapFormat for {}.'.format(ext))
     return f(_map)

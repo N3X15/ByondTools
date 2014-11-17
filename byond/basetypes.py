@@ -252,7 +252,7 @@ class Atom:
         self.UpdateHash()
         return self._hash
     
-    def copy(self):
+    def copy(self, toNewMap=False):
         '''
         Make a copy of this atom, without dangling references.
         
@@ -261,8 +261,9 @@ class Atom:
         new_node = Atom(self.path, self.filename, self.line, missing=self.missing)
         new_node.properties = self.properties.copy()
         new_node.mapSpecified = self.mapSpecified
-        new_node.ID = self.ID
-        new_node.old_id = self.old_id
+        if not toNewMap:
+            new_node.ID = self.ID
+            new_node.old_id = self.old_id
         new_node.UpdateHash()
         # new_node.parent = self.parent
         return new_node

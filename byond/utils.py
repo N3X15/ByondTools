@@ -1,7 +1,13 @@
-import hashlib, ast, os
-from time import clock
+import hashlib, ast, os, time, sys
+#from time import clock
 import operator as op
 
+def clock():
+    if sys.platform == 'win32':
+        return time.clock()
+    else:
+        return time.time()
+    
 def md5sum(filename):
     with open(filename, mode='rb') as f:
         d = hashlib.md5()
@@ -29,6 +35,24 @@ def eval_expr(expr):
 
 def getElapsed(start):
     return '%d:%02d:%02d.%03d' % reduce(lambda ll, b : divmod(ll[0], b) + ll[1:], [((clock() - start) * 1000,), 1000, 60, 60])
+
+def secondsToStr(t):
+    return "%d:%02d:%02d.%03d" % \
+        reduce(lambda ll,b : divmod(ll[0],b) + ll[1:],
+            [(t*1000,),1000,60,60])
+        
+class TimeExecution(object):
+    def __init__(self, label):
+        self.start_time=None
+        self.label = label
+    
+    def __enter__(self):
+        self.start_time = clock()
+        return self
+    
+    def __exit__(self, type, value, traceback):
+        logging.info('  Completed in {1}s - {0}'.format(self.label, secondsToStr(clock() - self.start_time)))
+        return False
 
 class ProfilingTarget:
     def __init__(self,name):

@@ -49,15 +49,51 @@ def main():
     _analyze = command.add_parser('analyze', help='Generate a report of each atom on a map.  WARNING: huge')
     _analyze.add_argument('map', type=str, help='Map to analyze.', metavar='map.dmm')
     
+    _split = command.add_parser('split', help='Split up a map by z-level.')
+    #_split.add_argument('-i','--isolate', help='Isolate a given z-level', metavar='NUM')
+    _split.add_argument('map', type=str, help='Map to split.', metavar='map.dmm')
+    
     args = opt.parse_args()
     if args.MODE == 'diff':
         compare_dmm(args)
     elif args.MODE == 'analyze':
         analyze_dmm(args)
+    elif args.MODE == 'split':
+        split_dmm(args)
     elif args.MODE == 'patch':
         patch_dmm(args)
     else:
         print('!!! Error, unknown MODE=%r' % args.MODE)
+        
+def split_dmm(args):
+    if not os.path.isfile(args.map):
+        print('File {0} does not exist.'.format(args.mine))
+        sys.exit(1)
+    if not os.path.isfile(args.project):
+        print('DM Environment File {0} does not exist.'.format(args.project))
+        sys.exit(1)
+    
+    dmm = Map(forgiving_atom_lookups=True)
+    dmm.Load(args.map, format='dmm')
+    
+    #fmt = DMMFormat(dmm)
+    
+    nz = len(dmm.zLevels)
+    for z in range(nz):
+        basename,ext = os.path.splitext(args.map)
+        outfile='{0}-{1}{2}'.format(basename,z+1,ext)
+        print('>>> Splitting z={}/{} to {}'.format(z+1,nz,outfile))
+        output = Map(forgiving_atom_lookups=True)
+        currentZLevel = dmm.zLevels[z]
+        newZLevel = output.CreateZLevel(currentZLevel.height, currentZLevel.width)
+        #newZLevel.initial_load=True
+        for y in range(currentZLevel.width):
+            for x in range(currentZLevel.height):
+                newTile = newZLevel.GetTile(x, y)
+                for atom in currentZLevel.GetTile(x,y).GetAtoms():
+                    newTile.AppendAtom(atom.copy(toNewMap=True))
+        #newZLevel.initial_load=False
+        output.Save(outfile, format='dmm')
 
 def patch_dmm(args):
     print(repr(args.patches))

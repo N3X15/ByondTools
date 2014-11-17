@@ -40,7 +40,7 @@ LoadMapFormats()
 def trim(im):
     bg = Image.new(im.mode, im.size, im.getpixel((0, 0)))
     diff = ImageChops.difference(im, bg)
-    diff = ImageChops.add(diff, diff, 2.0, -100)
+    diff = ImageChops.add(diff, diff, 1.0, -100) # scale was 2.0
     bbox = diff.getbbox()
     if bbox:
         return im.crop(bbox)
@@ -379,6 +379,7 @@ vTile = numpy.vectorize(Tile)
 
 class MapLayer:
     def __init__(self, z, _map, height=255, width=255):
+        self.initial_load=False
         self.map = _map
         self.min = (0, 0)
         self.max = (height - 1, width - 1)
@@ -386,7 +387,6 @@ class MapLayer:
         self.Resize(height, width)
         self.z = z
         
-        self.initial_load=False
         
     def GetTile(self, x, y):
         # return self.tiles[y][x]
@@ -415,6 +415,8 @@ class MapLayer:
             tile.ID=self.map.UpdateTile(tile)
         self.tiles[x, y] = tile.ID
         #self.map.tiles[tile.ID].addLocation((x, y, self.z))
+        
+        
     
     def SetTileID(self, x, y, newID):
         '''
@@ -496,7 +498,12 @@ class Map:
         return t
         
     def GetInstance(self, atomID):
-        a = self.instances[atomID]
+        a=None
+        try:
+            a = self.instances[atomID]
+        except IndexError as e:
+            self.log.critical('Unable to find instance {}!')
+            raise e
         if a is None:
             # print('WARNING: #{0} not found'.format(atomID)) 
             return None
@@ -551,7 +558,7 @@ class Map:
         '''
         thash = a.GetHash()
         
-        if a.ID and self.instances[a.ID] is not None:
+        if a.ID and len(self.instances) < a.ID and self.instances[a.ID] is not None:
             self.instances[a.ID].rmLocation(self, a.coords)
             
         if thash not in self._instance_idmap:
@@ -591,7 +598,7 @@ class Map:
     def Save(self, filename, **kwargs):
         _, ext = os.path.splitext(filename)
         fmt = kwargs.get('format', 'dmm2' if ext == 'dmm2' else 'dmm')
-        reader = GetMapFormat(self, kwargs.get('format', fmt))
+        reader = GetMapFormat(self, fmt)
         reader.Save(filename, **kwargs)
         
     def writeMap2(self, filename, flags=0):
@@ -973,7 +980,7 @@ class Map:
             
         if len(self.selectedAreas) == 0:            
             # Autocrop (only works if NOT rendering stars or areas)
-            pic = trim(pic)
+            pic = trim(pic)    
         else:
             # if nSelAreas == 0:
             #    continue
