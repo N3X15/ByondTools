@@ -988,7 +988,7 @@ class Map:
         
         if pic is not None:
             # Saev
-            filedir = os.path.dirname(filename)
+            filedir = os.path.dirname(os.path.abspath(filename))
             if not os.path.isdir(filedir):
                 os.makedirs(filedir)
             print(' -> {} ({}x{}) - {} objects'.format(filename, pic.size[0], pic.size[1], pastes))
