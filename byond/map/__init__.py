@@ -40,7 +40,7 @@ LoadMapFormats()
 def trim(im):
     bg = Image.new(im.mode, im.size, im.getpixel((0, 0)))
     diff = ImageChops.difference(im, bg)
-    diff = ImageChops.add(diff, diff, 1.0, -100) # scale was 2.0
+    diff = ImageChops.add(diff, diff, 2.0, -100)
     bbox = diff.getbbox()
     if bbox:
         return im.crop(bbox)
@@ -980,7 +980,8 @@ class Map:
             
         if len(self.selectedAreas) == 0:            
             # Autocrop (only works if NOT rendering stars or areas)
-            pic = trim(pic)    
+            #pic = trim(pic) # FIXME: MemoryError on /vg/.
+            pic=pic # Hack
         else:
             # if nSelAreas == 0:
             #    continue

@@ -704,8 +704,8 @@ class ObjectTree:
         for path_item in truncatedPath:
             cpath += [path_item]
             if path_item not in cNode.children:
-                print('Unable to find {0} (lost at {1})'.format(path, cNode.path))
-                print(repr(cNode.children.keys()))
+                print('!!! Unable to find {0} (lost at {1})'.format(path, cNode.path))
+                print(' Valid children: {0}'.format(', '.join(cNode.children.keys())))
                 return None
             cNode = cNode.children[path_item]
         # print('Found {0}!'.format(path))
