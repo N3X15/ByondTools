@@ -45,6 +45,9 @@ def BYOND2RGBA(colorstring, alpha=255):
         r, g, b = colorstring[:2], colorstring[2:4], colorstring[4:]
         r, g, b = [int(n, 16) for n in (r, g, b)]
         return (r, g, b, alpha)
+    elif colorstring.startswith('rgb('):
+        r, g, b = [int(n.strip()) for n in colorstring[4:-1].split(',')]
+        return (r, g, b, alpha)
     else:
         return _COLOR_LOOKUP[colorstring]
     

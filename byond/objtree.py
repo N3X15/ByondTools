@@ -2,6 +2,7 @@
 Superficially generate an object/property tree.
 '''
 import re, logging, os
+import sre_constants
 
 try:
     import cPickle as pickle
@@ -21,7 +22,7 @@ def debug(filename, line, path, message):
     print('{0}:{1}: {2} - {3}'.format(filename, line, '/'.join(path), message))
     
 class OTRCache:
-    # : Only used for obliterating outdated data.
+    #: Only used for obliterating outdated data.
     VERSION = [18, 6, 2014]
     
     def __init__(self, filename):
@@ -193,7 +194,7 @@ class ObjectTree:
                         if c == '"':
                             inString = not inString
                             if not inString:
-                                filepath = os.path.join(rootdir, filename.replace('\\',os.sep))
+                                filepath = os.path.join(rootdir, filename.replace('\\', os.sep))
                                 if filepath.endswith(ext):
                                     ToRead += [filepath]
                                 filename = ''
@@ -470,6 +471,11 @@ class ObjectTree:
                         elif len(defineChunks) == 3:
                             defineChunks[2] = self.PreprocessLine(defineChunks[2])
                         # print(repr(defineChunks))
+                        
+                        # TODO: We don't know how to handle parameterized macros yet.
+                        if '(' in defineChunks[1]:
+                            continue
+                        
                         try:
                             if '.' in defineChunks[2]:
                                 self.defines[defineChunks[1]] = BYONDValue(float(defineChunks[2]), filename, ln)
@@ -620,6 +626,12 @@ class ObjectTree:
             if pathchunks[0] in ('tmp', 'global', 'const'):
                 special = pathchunks[0]
                 pathchunks = pathchunks[1:]
+                
+            if name.endswith(']'):
+                name = name[:name.index('[')]
+                if size is None:
+                    size = -1
+                
             if 'list' not in pathchunks and size is not None:
                 pathchunks = ['list'] + pathchunks
             typepath = '/' + '/'.join(pathchunks[:-1])
@@ -705,7 +717,11 @@ class ObjectTree:
         for key, define in self.defines.items():
             if key in line:
                 if key not in self.defineMatchers:
-                    self.defineMatchers[key] = re.compile(r'\b' + key + r'\b')
+                    try:
+                        self.defineMatchers[key] = re.compile(r'\b' + key + r'\b')
+                    except sre_constants.error:
+                        print('!!! Unable to compile regex for {}!'.format(key))
+                        continue
                 newline = self.defineMatchers[key].sub(str(define.value), line)
                 if newline != line:
                     '''
