@@ -21,6 +21,18 @@ class AtomTest(unittest.TestCase):
         atom2_serialized=atom2.dumpPropInfo('test')
         
         self.assertEqual(atom_serialized, atom2_serialized)
+        
+    def test_serialization(self):
+        from byond.basetypes import Atom, BYONDString, BYONDValue
+        atom = Atom('/datum/test',__file__,0)
+        atom.properties={
+            'dir': BYONDValue(2),
+            'name': BYONDString('test datum')
+        }
+        
+        atom_serialized='/datum/test{name="test datum";dir=2}'
+        
+        self.assertEqual(str(atom), atom_serialized)
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']

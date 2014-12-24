@@ -40,6 +40,10 @@ def main():
     _compare.add_argument('theirs', type=str, help='One side of the difference', metavar='theirs.dmm')
     _compare.add_argument('mine', type=str, help='The other side.', metavar='mine.dmm')
     
+    _transcribe = command.add_parser('transcribe', help='Re-write a map file (used for parser debugging).')
+    _transcribe.add_argument('-O', '--output', dest='output', type=str, help='The other side.', metavar='map.trans.dmm', nargs='?')
+    _transcribe.add_argument('subject', type=str, help='Map file to re-write.', metavar='map.dmm')
+    
     _patch = command.add_parser('patch', help='Apply a map patch.')
     _patch.add_argument('-O', '--output', dest='output', type=str, help='Where to place the patched map. (Default is to overwrite input map)', metavar='mine.dmdiff', nargs='?')
     _patch.add_argument('--clobber', dest='clobber', action="store_true", help='Overwrite conflicts')
@@ -62,8 +66,24 @@ def main():
         split_dmm(args)
     elif args.MODE == 'patch':
         patch_dmm(args)
+    elif args.MODE == 'transcribe':
+        transcribe_dmm(args)
     else:
         print('!!! Error, unknown MODE=%r' % args.MODE)
+        
+def transcribe_dmm(args):
+    if not os.path.isfile(args.subject):
+        print('File {0} does not exist.'.format(args.subject))
+        sys.exit(1)
+    if not os.path.isfile(args.project):
+        print('DM Environment File {0} does not exist.'.format(args.project))
+        sys.exit(1)
+    
+    dmm = Map(forgiving_atom_lookups=True)
+    basename,ext = os.path.splitext(args.subject)
+    outfile='{0}.trans{1}'.format(basename,ext)
+    dmm.Load(args.subject, format='dmm')
+    dmm.Save(outfile, format='dmm', serialize_cleanly=True)
         
 def split_dmm(args):
     if not os.path.isfile(args.map):
