@@ -147,6 +147,7 @@ class Tile(object):
         
     def UpdateHash(self, no_map_update=False):
         if self._hash is None:
+            # Why MD5?  Because the shorter the string, the faster the comparison.
             self._hash = hashlib.md5(str(self)).hexdigest()
             if not no_map_update: 
                 self.ID=self.map.UpdateTile(self)
@@ -208,9 +209,12 @@ class Tile(object):
     def GetAtoms(self):
         atoms = []
         for id in self.instances:
-            if id is None: continue
+            if id is None: 
+                continue
             a = self.map.GetInstance(id)
-            if a is None: continue
+            if a is None:
+                print('WARNING: Unknown instance ID {}!'.format(id))
+                continue
             atoms += [a]
         return atoms
     
@@ -374,8 +378,6 @@ class Tile(object):
             img = Image.merge(img.mode, bands)
         
         return img
-    
-vTile = numpy.vectorize(Tile)
 
 class MapLayer:
     def __init__(self, z, _map, height=255, width=255):
@@ -488,6 +490,13 @@ class Map:
         self.missing_atoms = set()
         
         self.basetile.UpdateHash();
+        
+    def ResetTilestore(self):
+        '''For loading maps.  Resets tile data to a pristine state.'''
+        
+        self.instances = []  # Atom
+        self.tiles = []  # Tile
+        self.basetile = None
         
     def GetTileByID(self, tileID):
         t = self.tiles[tileID]
@@ -940,10 +949,13 @@ class Map:
                     pos = (x, y)
                     
                     instancePositions[iid].append(pos)
+                    
+                    t=None
         
         if len(instancePositions) == 0:
             return
         
+        print(' Rendering...')
         levelAtoms = []
         for iid in instancePositions:
             levelAtoms += [self.GetInstance(iid)]
@@ -959,9 +971,11 @@ class Map:
         pastes = 0
         for atom in sorted(levelAtoms, reverse=True):
             if atom.ID not in instancePositions:
+                levelAtoms.remove(atom)
                 continue
             icon = self.renderAtom(atom, basedir, skip_alpha)
             if icon is None:
+                levelAtoms.remove(atom)
                 continue
             for x, y in instancePositions[atom.ID]:
                 new_bb = self.getBBoxForAtom(x, y, atom, icon)
@@ -977,6 +991,11 @@ class Map:
                     bbox[3] = new_bb[3]
                 pic.paste(icon, new_bb, icon)
                 pastes += 1
+            icon=None # Cleanup
+            levelAtoms.remove(atom)
+        
+        levelAtoms = None
+        instancePositions = None
             
         if len(self.selectedAreas) == 0:            
             # Autocrop (only works if NOT rendering stars or areas)

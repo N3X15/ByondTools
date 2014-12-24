@@ -49,7 +49,7 @@ class MapParserTest(unittest.TestCase):
         testSerData='/obj/structure/cable{d1=1;d2=2;icon_state="1-2";tag=""},/obj/machinery/atmospherics/pipe/simple/supply/hidden{dir=4},/turf/simulated/floor{icon_state="floorgrime"},/area/security/prison{}'
         
         out = self.dmm.consumeTile(testStr, 0, False) # :type out: Tile
-        print('IIDs: {0}'.format(repr(out.instances)))
+        #print('IIDs: {0}'.format(repr(out.instances)))
 
         self.assertEquals(out.origID, 'aaK', 'origID')
         self.assertEquals(len(out.instances), 4, 'instances size')
@@ -61,6 +61,66 @@ class MapParserTest(unittest.TestCase):
         self.assertIn('icon_state', out.GetAtom(2).properties, 'Failure to parse /turf/simulated/floor{icon_state = "floorgrime"}')
         
         self.assertEqual(out._serialize(), testSerData)
+        
+    def _show_expected_vs_actual(self,expected,actual):
+        if expected != actual:
+            print(' > EXPECTED: {}'.format(expected))
+            print(' > ACTUAL:   {}'.format(actual))
+        
+    
+    def test_basic_SerializeTile_operation(self):
+        from byond.map import Map, Tile
+        '''
+        "aaK" = (
+            /obj/structure/cable{
+                d1 = 1;
+                d2 = 2; 
+                icon_state = "1-2";
+                tag = ""
+            },
+            /obj/machinery/atmospherics/pipe/simple/supply/hidden{
+                dir = 4
+            },
+            /turf/simulated/floor{
+                icon_state = "floorgrime"
+            },
+            /area/security/prison
+        )
+        '''
+        testStr = '"aaK" = (/obj/structure/cable{d1 = 1; d2 = 2; icon_state = "1-2"; tag = ""},/obj/machinery/atmospherics/pipe/simple/supply/hidden{dir = 4},/turf/simulated/floor{icon_state = "floorgrime"},/area/security/prison)'
+        expected = testStr.split('=',1)[1].strip()
+        tile = self.dmm.consumeTile(testStr, 0, False) # :type tile: Tile
+        out = self.dmm.SerializeTile(tile)
+        self._show_expected_vs_actual(expected, out)
+        self.assertEqual(out, expected)
+    def test_consumeTile_secureArea(self):
+        '''
+        "aai" = (
+            /obj/structure/sign/securearea{
+                desc = "A warning sign which reads \'HIGH VOLTAGE\'"; 
+                icon_state = "shock"; 
+                name = "HIGH VOLTAGE"; 
+                pixel_y = -32
+            },
+            /turf/space,
+            /area
+        )
+        '''
+        testStr = '"aai" = (/obj/structure/sign/securearea{desc = "A warning sign which reads \'HIGH VOLTAGE\'"; icon_state = "shock"; name = "HIGH VOLTAGE"; pixel_y = -32},/turf/space,/area)'
+
+        tile = self.dmm.consumeTile(testStr, 0, False) # :type tile: Tile
+        
+        self.assertEquals(tile.origID, 'aai', 'origID')
+        self.assertEquals(len(tile.instances), 3, 'instances size')
+        self.assertEquals(len(tile.GetAtom(0).properties), 4, 'instances[0] properties')
+        self.assertIn('desc', tile.GetAtom(0).properties, 'desc not present in properties')
+        self.assertListEqual(tile.GetAtom(0).mapSpecified,['desc','icon_state','name','pixel_y'])
+        
+        expected = testStr.split('=',1)[1].strip()
+        out = self.dmm.SerializeTile(tile)
+        self._show_expected_vs_actual(expected, out)
+        self.assertEqual(out, expected)
+
         
     def test_consumeTile_landmark(self):
         testStr='"aah" = (/obj/effect/landmark{name = "carpspawn"},/obj/structure/lattice,/turf/space,/area)'
