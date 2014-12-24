@@ -65,6 +65,7 @@ class DMMFormat(BaseMapFormat):
     def Load(self, filename, **kwargs):
         if not os.path.isfile(filename):
             self.log.warn('File ' + filename + " does not exist.")
+        self.map.ResetTilestore()
         self.filename = filename
         with open(filename, 'r') as f:
             print('Reading tile types from {0}...'.format(self.filename))
@@ -110,7 +111,7 @@ class DMMFormat(BaseMapFormat):
                 height = 0
                 
                 start = clock()
-                print(dbg_p+' START z={}'.format(z))
+                #print(dbg_p+' START z={}'.format(z))
                 continue
             if line.strip() == '"}':
                 zLevel.initial_load=False
@@ -125,7 +126,7 @@ class DMMFormat(BaseMapFormat):
                 if zLevel is None:
                     zLevel = self.map.CreateZLevel(height, width)  # , z-1)
                     zLevel.initial_load=True
-                    print(dbg_p+' CREATED z={}'.format(z))
+                    #print(dbg_p+' CREATED z={}'.format(z))
                 if width == 0:
                     width = len(line) / self.idlen
                     #print('Width detected as {}.'.format(width))
@@ -158,10 +159,13 @@ class DMMFormat(BaseMapFormat):
                 self.tileTypes += [t]
                 self.idlen = max(self.idlen, len(t.origID))
                 if t.origID=='':
-                    print('{}:{}: ERROR: Unable to determine origID.'.format(self.filename,lineNumber))
+                    self.log.warning('{}:{}: ERROR: Unable to determine origID.'.format(self.filename,lineNumber))
                     sys.exit(1)
-                #print('Loaded tile #{} ({})'.format(t.ID,t.origID))
-                #if t.origID == 'aaa': print('aaa = {}'.format(t.ID))
+                if t.origID == 'aaa':
+                    self.map.basetile=t
+                    self.log.debug('{}:{}: Loaded tile #{} ({}) as map.basetile.'.format(self.filename,lineNumber,t.ID,t.origID))
+                #if t.origID == 'aai':
+                #    print('Loaded tile #{} ({}): {}'.format(t.ID,t.origID,str(t)))
                 self.oldID2NewID[t.origID] = t.ID
                 self.tileChunk2ID[self.SerializeTile(t)] = t.ID
                 index += 1
@@ -169,19 +173,26 @@ class DMMFormat(BaseMapFormat):
                 # if((index % 100) == 0):
                 #   print(index)
             else:
-                self.log.info('-- {} tiles loaded, {} duplicates discarded'.format(index, self.duplicates))
+                self.log.info('{} tiles loaded, {} duplicates discarded'.format(index, self.duplicates))
                 return 
     
     def consumeTileAtoms(self, line, lineNumber):
         instances = []
         atom_chunks = self.SplitAtoms(line)
 
+        dbg = False#lineNumber == 9
         for atom_chunk in atom_chunks:
             if atom_chunk in self.atomCache:
-                instances += [self.atomCache[atom_chunk]]
+                atom=self.atomCache[atom_chunk]
+                if dbg:
+                    print('[CACHED] Adding {} as {}.'.format(atom_chunk,str(atom)))
+                instances += [atom]
             else:
                 atom = self.consumeAtom(atom_chunk, lineNumber)
-                atom.ID = self.map.UpdateAtom(atom)
+                atom.InvalidateHash()
+                atom.UpdateMap(self.map)
+                if dbg:
+                    print('Adding {} ({}) as {}.'.format(atom_chunk,atom.GetHash(),str(atom)))
                 self.atomCache[atom_chunk] = atom
                 instances += [atom]
             
@@ -271,11 +282,11 @@ class DMMFormat(BaseMapFormat):
             if currentAtom is not None:
                 return currentAtom
             else:
-                self.log.critical('{file}:{line}: Failed to consumeAtom({data}):  Unable to locate atom.'.format(file=self.filename, line=lineNumber, data=line))
+                print('{file}:{line}: Failed to consumeAtom({data}):  Unable to locate atom.'.format(file=self.filename, line=lineNumber, data=line))
                 return None
         chunks = line.split('{')
         if len(chunks) < 2:
-            self.log.error('{file}:{line}: Something went wrong in consumeAtom(). line={data}'.format(file=self.filename, line=lineNumber, data=line))
+            print('{file}:{line}: Something went wrong in consumeAtom(). line={data}'.format(file=self.filename, line=lineNumber, data=line))
         atom = chunks[0].strip()
         if atom.endswith('/'):
             self.log.warn('{file}:{line}: Malformed atom: {data} has ending slash.  Stripping slashes from right side.'.format(file=self.filename, line=lineNumber, data=atom))
@@ -296,7 +307,7 @@ class DMMFormat(BaseMapFormat):
             key = pparts[0].strip()
             value = pparts[1].strip()
             if key == '':
-                self.log.warn('Ignoring property with blank name. (given {0})'.format(chunk))
+                print('Ignoring property with blank name. (given {0})'.format(chunk))
                 continue
             data = self.consumeDataValue(value, lineNumber)
             if key not in currentAtom.mapSpecified:
@@ -330,7 +341,7 @@ class DMMFormat(BaseMapFormat):
         t = self.map.CreateTile()
         tileChunk = line.strip()[line.index('(') + 1:-1]
         if tileChunk == '':
-            print('{file}:{line}: MALFORMED TILE CHUNK: {}'.format(self.filename, lineNumber, tileChunk))
+            print('{}:{}: MALFORMED TILE CHUNK: {}'.format(self.filename, lineNumber, tileChunk))
         if cache and origID is not None: 
             #print('CACHING...')
             if tileChunk in self.tileChunk2ID:
@@ -390,9 +401,9 @@ class DMMFormat(BaseMapFormat):
         return o
     
     def String2ID(self, _id):
-        #o = 0
-        #for i, c in enumerate(reversed(_id)):
-        #    o += ID_ENCODING_TABLE.index(c) * (IET_SIZE ** i)
+        o = 0
+        for i, c in enumerate(reversed(_id)):
+            o += ID_ENCODING_TABLE.index(c) * (IET_SIZE ** i)
         return _id
     
     def AssignTID(self, tile):
@@ -406,9 +417,9 @@ class DMMFormat(BaseMapFormat):
         return self.ID2String(tile)
     
     def GetTID(self, tile):
-        # print('GetTID: origID: {}'.format(repr(tile.origID)))
+        #print('GetTID: origID: {}'.format(repr(tile.origID)))
         if self.serialize_cleanly and tile.origID != '':
-            return tile.origID
+            return self.String2ID(tile.origID)
         else:
             return tile.ID
     
@@ -455,6 +466,8 @@ class DMMFormat(BaseMapFormat):
             # tile.ID = len(examined)
             examined += [strt]
             tid = self.GetTID(tile)
+            if tile.origID=='aaa':
+                print('{} -> {}'.format(tile.origID,tid))
             if tid in self.typeMap:
                 if hashMap.get(strt, None) == tid:
                     if dbg: print('Continuing: TID {} in typeMap, hashes match.'.format(tid))
@@ -463,7 +476,8 @@ class DMMFormat(BaseMapFormat):
                 tid = len(self.typeMap)
                 while tid in self.typeMap:
                     tid += 1
-                # print('{} assigned to new TID {}'.format(strt,tid))
+
+                print('{} assigned to new TID {}'.format(strt,tid))
             maxid = max(maxid, tid)
             self.typeMap[tid] = (strt, self.SerializeTile(tile))
             last_str = strt
@@ -478,6 +492,8 @@ class DMMFormat(BaseMapFormat):
             for tid in sorted(self.typeMap.keys()):
                 stid = self.ID2String(tid, idlen)
                 strt, serdata = self.typeMap[tid]
+                if serdata == '(/turf/space,/area)':
+                    print('{} -> {}'.format(tid,stid))
                 f.write('"{}" = {}\n'.format(stid, serdata))
                 self.type2TID[strt] = stid
             print(' Wrote types in {}...'.format(getElapsed(start)))

@@ -404,7 +404,6 @@ class Atom:
         return myLayer < otherLayer
         
     def __str__(self):
-        
         atomContents = []
         for key, val in self.properties.items():
             atomContents += ['{0}={1}'.format(key, val)]
