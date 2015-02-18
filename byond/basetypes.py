@@ -146,6 +146,30 @@ class BYONDString(BYONDValue):
         
     def __repr__(self):
         return '<BYONDString value="{}" filename="{}" line={}>'.format(self.value, self.filename, self.line)
+
+class BYONDList(BYONDValue):
+    """
+    Correctly formats lists (dict/lists).
+    """
+    def __init__(self, value, filename='', line=0, **kwargs):
+        BYONDValue.__init__(self, value, filename, line, '/', **kwargs)
+        
+    def copy(self):
+        return BYONDString(self.value, self.filename, self.line, declaration=self.declaration, inherited=self.inherited, special=self.special)
+        
+    def __str__(self):
+        vals = []
+        if type(self.value) is dict:
+            for k,v in self.value.items():
+                wk=byond_wrap(k)
+                wv=byond_wrap(v)
+                vals.append('{} = {}'.format(k,v))
+        else:
+            vals = self.value
+        return 'list({0})'.format(', '.join(vals))
+        
+    def __repr__(self):
+        return '<BYONDList value="{}" filename="{}" line={}>'.format(self.value, self.filename, self.line)
     
 class PropertyFlags:
     '''Collection of flags that affect :func:`Atom.setProperty` behavior.'''
@@ -420,7 +444,9 @@ class Atom:
         o = divider
         o += '// ' + self.path + '\n'
         o += divider
+        
         o += self.path + '\n'
+        
         # o += '\t//{0} properties total\n'.format(len(self.properties))
         for name in sorted(self.properties.keys()):
             prop = self.properties[name]
@@ -525,3 +551,16 @@ class Proc(Atom):
             else:
                 o += (indent * '\t') + code.strip() + '\n'
         return o
+
+def byond_wrap(value):
+    '''Wrap a Python instance with the proper BYONDValue type.
+    '''
+    T = type(value)
+    if T is BYONDValue:
+        return value
+    if T is str or T is unicode:
+        return BYONDString(value)
+    elif T is list or T is dict:
+        return BYONDList(value)
+    else:
+        return BYONDValue(value)

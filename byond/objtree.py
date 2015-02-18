@@ -3,13 +3,14 @@ Superficially generate an object/property tree.
 '''
 import re, logging, os
 import sre_constants
+from byond.script.dmscript import ParseDreamList
 
 try:
     import cPickle as pickle
 except:
     import pickle
    
-from .basetypes import Atom, Proc, BYONDValue, BYONDString, BYONDFileRef
+from .basetypes import Atom, Proc, BYONDValue, BYONDString, BYONDFileRef, BYONDList
 from .utils import md5sum, get_stdlib
 
 REGEX_TABS = re.compile('^(?P<tabs>[\t\s]*)')
@@ -362,6 +363,10 @@ class ObjectTree:
         name = 'ob_{0}'.format(name.lower())
         getattr(self, name)(context, *params)
         
+    def NewProcessFile(self, filename):
+        '''SOON'''
+        return
+        
     def ProcessFile(self, filename):
         self.cpath = []
         self.popLevels = []
@@ -440,6 +445,7 @@ class ObjectTree:
                         nl += c
                     else:
                         self.comment += c
+                        
                 if line != nl:
                     if self.ignoreDebugOn: print('IN : ' + line)
                     line = nl
@@ -654,6 +660,8 @@ class ObjectTree:
                 return (name, BYONDValue(float(value), filename, ln, typepath, **kwargs))
             except ValueError:
                 pass
+        #elif value and value.startswith('list('):
+        #    return (name, BYONDList(ParseDreamList(value), filename, ln, typepath, **kwargs))
         elif value == 'null':
             return (name, BYONDValue(None, filename, ln, typepath, **kwargs))
         return (name, BYONDValue(value, filename, ln, typepath, **kwargs))
