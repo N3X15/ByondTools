@@ -121,7 +121,7 @@ class AtomIterator:
     def next(self):
         self.pos += 1
             
-        if self.pos >= len(self.map.instances):
+        if self.pos >= len(self.max):
             raise StopIteration
         
         t = self.map.instances[self.pos]

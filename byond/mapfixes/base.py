@@ -129,6 +129,7 @@ class ChangeType(Matcher):
             else:
                 logging.warn('[{}] Found type, but marked not missing: {}'.format(self.__class__.__name__,atom.path))
                 logging.warn('{}:{}: Target type found here'.format(atom.filename, atom.line))
+                return True
         return False
     
     def Fix(self, atom):

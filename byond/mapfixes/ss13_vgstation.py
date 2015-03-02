@@ -27,6 +27,7 @@ class FixNetwork(Matcher):
     def __str__(self):
         return 'Changed network property to list'
    
+'''
 @MapFix('vgstation-NET2')
 class NetworkingChangeAtmos(ChangeType):
     def __init__(self):
@@ -41,6 +42,7 @@ class NetworkingChangePower(ChangeType):
 class NetworkingChangeFiber(ChangeType):
     def __init__(self):
         ChangeType.__init__(self,'/obj/machinery/fiber','/obj/machinery/networked/fiber', fuzzy = True)
+'''
    
 @MapFix('vgstation')
 class FixIDTags(Matcher):
