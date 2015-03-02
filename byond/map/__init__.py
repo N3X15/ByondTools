@@ -99,11 +99,11 @@ class TileIterator:
     def next(self):
         self.pos += 1
             
-        if self.pos >= len(self.map.tiles):
+        if self.pos >= self.max:
             raise StopIteration
         
         t = self.map.tiles[self.pos]
-        # print('#{} = {}'.format(self.pos,str(t)))
+        #print('#{} = {}'.format(self.pos,str(t)))
         return t
 
 class AtomIterator:
@@ -590,9 +590,13 @@ class Map:
         return zLevel
     
     def Atoms(self):
+        '''Iterates over all instances in the map.
+        '''
         return AtomIterator(self)
     
     def Tiles(self):
+        '''Iterates over all tiles of the map.
+        '''
         return TileIterator(self)
     
     def Locations(self):

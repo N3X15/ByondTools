@@ -23,13 +23,22 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 """
-import sys, argparse
-from byond.map import Map
+import sys, argparse, logging
+from byond.map import Map, Tile
 from byond.objtree import ObjectTree
 #from byond.basetypes import BYONDString, BYONDValue, Atom, PropertyFlags
 #from byond.directions import *
 
 from byond import mapfixes
+
+
+logging.basicConfig(
+    format='%(asctime)s [%(levelname)-8s]: %(message)s',
+    datefmt='%m/%d/%Y %I:%M:%S %p',
+    level=logging.INFO  # ,
+    # filename='logs/main.log',
+    # filemode='w'
+    )
 
 opt = argparse.ArgumentParser()  # version='0.1')
 opt.add_argument('-O', '--output', dest='output', type=str, help='Where to place the patched map. (Default is to overwrite input map)', metavar='butts.dmm', nargs='?')
@@ -72,14 +81,18 @@ for fixscript in args.fixscripts:
                 force = subject == 'type!'
                 old, new = action.split('>')
                 newtype = new.strip()
-                if tree.GetAtom(newtype) is None:
-                    print('{0}:{1}: {2}'.format(sys.argv[2], ln, line.strip('\r\n')))
-                    print('  ERROR: Unable to find replacement type "{0}".'.format(newtype))
+                if newtype != "" and not newtype.startswith('/'):
+                    logging.error('{0}:{1}: ERROR: Type "{2}" is not absolute. It must start with "/".  Example: /obj/item/book'.format(fixscript, ln,newtype))
                     errors += 1
-                actions += [mapfixes.base.ChangeType(old.strip(), newtype, force)]
+                elif tree.GetAtom(newtype) is None:
+                    logging.error('{0}:{1}: ERROR: Unable to find replacement type "{2}".'.format(fixscript, ln,newtype))
+                    errors += 1
+                else:
+                    actions += [mapfixes.base.ChangeType(old.strip(), newtype, force)]
         if errors > 0:
-            print('!!! {0} errors, please fix them.'.format(errors))
+            logging.critical('Found {0} errors, please fix them.'.format(errors))
             sys.exit(1)
+            
 dmm = Map(tree, forgiving_atom_lookups=1)
 dmm.Load(args.map)
 #dmm.Load(args.map.replace('.dmm', '.dmm2'))
@@ -87,36 +100,55 @@ print('Changes to make:')
 for action in actions:
     print(' * ' + str(action))
 print('Iterating tiles...')
-warudo = dmm.Tiles()
-for tile in warudo:
+hashMap={} # hash => null to remove, hash => True to not remove, hash => Tile to replace with this.
+it = dmm.Tiles()
+thousandsActivity=0
+for tile in it:
     if tile is None: continue
-    for atom in tile.GetAtoms():
+    for atom in tile.GetAtoms(): 
+        ': :type atom Atom:'
         changes = []
         tile.RemoveAtom(atom)
-        atomInfo='{0} (#{1}):'.format(atom.path, atom.ID)
-        for action in actions:
-            action.SetTree(tree)
-            if action.Matches(atom):
-                atom = action.Fix(atom)
-                changes += [str(action)]
-                if atom is None: break
-        
-        '''
-        compiled_atom = tree.GetAtom(atom.path)
-        if compiled_atom is not None:
-            for propname in list(atom.properties.keys()):
-                if propname not in compiled_atom.properties and propname not in ('req_access_txt','req_one_access_txt'):
-                    del atom.properties[propname]
-                    if propname in atom.mapSpecified:
-                        atom.mapSpecified.remove(propname)
-                    changes += ['Dropped property {0} (not found in compiled atom)'.format(propname)]
-        '''
-        if len(changes) > 0:
-            print(atomInfo if atom is not None else '{} (DELETED)'.format(atomInfo))
-            for change in changes:
-                print(' * ' + change)
+        hash = atom.GetHash()
+        if hash in hashMap:
+            val = hashMap[hash]
+            if val is None or type(val) is Tile:
+                atom = val
+        else:
+            atomInfo='{0} #{1} (Tile #{2}/{3}):'.format(atom.path, atom.ID, it.pos, it.max)
+            for action in actions:
+                action.SetTree(tree)
+                if action.Matches(atom):
+                    atom = action.Fix(atom)
+                    changes += [str(action)]
+                    if atom is None: break
+            
+            '''
+            compiled_atom = tree.GetAtom(atom.path)
+            if compiled_atom is not None:
+                for propname in list(atom.properties.keys()):
+                    if propname not in compiled_atom.properties and propname not in ('req_access_txt','req_one_access_txt'):
+                        del atom.properties[propname]
+                        if propname in atom.mapSpecified:
+                            atom.mapSpecified.remove(propname)
+                        changes += ['Dropped property {0} (not found in compiled atom)'.format(propname)]
+            '''
+            if len(changes) > 0:
+                thousandsActivity+=1
+                print(atomInfo if atom is not None else '{} (DELETED)'.format(atomInfo))
+                for change in changes:
+                    print(' * ' + change)
         if atom is not None:
             tile.AppendAtom(atom)
+        if hash not in hashMap:
+            if len(changes) == 0:
+                hashMap[hash]=True
+            else:
+                hashMap[hash]=atom
+    if (it.pos % 1000) == 0:
+        if thousandsActivity == 0:
+            print(it.pos)
+        thousandsActivity=0
 #for atom, _ in atomsToFix.items():
 #    print('Atom {0} needs id_tag.'.format(atom))
 with open(args.map + '.missing', 'w') as f:
