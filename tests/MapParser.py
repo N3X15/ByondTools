@@ -48,7 +48,7 @@ class MapParserTest(unittest.TestCase):
         testStr = '"aaK" = (/obj/structure/cable{d1 = 1; d2 = 2; icon_state = "1-2"; tag = ""},/obj/machinery/atmospherics/pipe/simple/supply/hidden{dir = 4},/turf/simulated/floor{icon_state = "floorgrime"},/area/security/prison)'
         testSerData='/obj/structure/cable{d1=1;d2=2;icon_state="1-2";tag=""},/obj/machinery/atmospherics/pipe/simple/supply/hidden{dir=4},/turf/simulated/floor{icon_state="floorgrime"},/area/security/prison{}'
         
-        out = self.dmm.consumeTile(testStr, 0, False) # :type out: Tile
+        out = self.dmm.consumeTile(testStr, False) # :type out: Tile
         #print('IIDs: {0}'.format(repr(out.instances)))
 
         self.assertEquals(out.origID, 'aaK', 'origID')
@@ -89,7 +89,7 @@ class MapParserTest(unittest.TestCase):
         '''
         testStr = '"aaK" = (/obj/structure/cable{d1 = 1; d2 = 2; icon_state = "1-2"; tag = ""},/obj/machinery/atmospherics/pipe/simple/supply/hidden{dir = 4},/turf/simulated/floor{icon_state = "floorgrime"},/area/security/prison)'
         expected = testStr.split('=',1)[1].strip()
-        tile = self.dmm.consumeTile(testStr, 0, False) # :type tile: Tile
+        tile = self.dmm.consumeTile(testStr, False) # :type tile: Tile
         out = self.dmm.SerializeTile(tile)
         self._show_expected_vs_actual(expected, out)
         self.assertEqual(out, expected)
@@ -108,7 +108,7 @@ class MapParserTest(unittest.TestCase):
         '''
         testStr = '"aai" = (/obj/structure/sign/securearea{desc = "A warning sign which reads \'HIGH VOLTAGE\'"; icon_state = "shock"; name = "HIGH VOLTAGE"; pixel_y = -32},/turf/space,/area)'
 
-        tile = self.dmm.consumeTile(testStr, 0, False) # :type tile: Tile
+        tile = self.dmm.consumeTile(testStr, False) # :type tile: Tile
         
         self.assertEquals(tile.origID, 'aai', 'origID')
         self.assertEquals(len(tile.instances), 3, 'instances size')
@@ -125,7 +125,7 @@ class MapParserTest(unittest.TestCase):
     def test_consumeTile_landmark(self):
         testStr='"aah" = (/obj/effect/landmark{name = "carpspawn"},/obj/structure/lattice,/turf/space,/area)'
         testSerData='/obj/effect/landmark{name="carpspawn"},/obj/structure/lattice{},/turf/space{},/area{}'
-        out = self.dmm.consumeTile(testStr, 0)
+        out = self.dmm.consumeTile(testStr)
         self.assertEqual(out._serialize(), testSerData)
 
 
