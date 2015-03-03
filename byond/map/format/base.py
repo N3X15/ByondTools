@@ -1,4 +1,6 @@
+import logging
 
+_log = logging.getLogger("byond.mapformat")
 # Decorator
 class MapFormat(object):
     all = {}
@@ -9,16 +11,16 @@ class MapFormat(object):
         if self.id is None:
             fname_p = c.__name__
             self.id = fname_p
-        print('Adding Map Format "{}" (.{})...'.format(self.id,self.extension))
+        _log.info('Adding Map Format "{}" (.{})...'.format(self.id,self.extension))
         if self.extension in MapFormat.all:
-            print('!!! *.{} FILES ARE ALREADY HANDLED BY {}!'.format(self.extension,self.id))
+            _log.warn('*.{} FILES ARE ALREADY HANDLED BY {}!'.format(self.extension,self.id))
         MapFormat.all[self.extension] = c
         return c
     
 def GetMapFormat(_map,ext):
     f = MapFormat.all.get(ext.strip('.'),None)
     if f is None:
-        print('Unable to find MapFormat for {}.'.format(ext))
+        _log.error('Unable to find MapFormat for {}.'.format(ext))
     return f(_map)
     
 class BaseMapFormat:

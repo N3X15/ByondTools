@@ -1,11 +1,13 @@
 import logging, glob, os, sys
 from .base import MapFix, GetDependencies
-   
+
+_log = logging.getLogger('byond.mapfixes')
+
 def Load():
-    print('Loading MapFix Modules...')
+    _log.info('Loading MapFix Modules...')
     for f in glob.glob(os.path.dirname(__file__) + "/*.py"):
         modName = 'byond.mapfixes.' + os.path.basename(f)[:-3]
-        print(' Loading module ' + modName)
+        _log.debug(' Loading module ' + modName)
         mod = __import__(modName)
         for attr in dir(mod):
             if not attr.startswith('_'):
@@ -21,11 +23,11 @@ def GetFixesForNS(namespaces, load_dependencies=True):
             changed = False
             for cat in selected:
                 if cat is None: continue  # Global namespace is always needed.
-                print('Checking dependencies for {}...'.format(cat))
+                _log.debug('Checking dependencies for {}...'.format(cat))
                 if cat in depends:
                     for newcat in depends[cat]:
                         if newcat not in selected:
-                            print('Selected dependency {} (required by {})'.format(newcat,cat))
+                            _log.debug('Selected dependency {} (required by {})'.format(newcat,cat))
                             selected += [newcat]
                             changed = True
     o = []

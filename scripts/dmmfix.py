@@ -96,10 +96,10 @@ for fixscript in args.fixscripts:
 dmm = Map(tree, forgiving_atom_lookups=1)
 dmm.Load(args.map)
 #dmm.Load(args.map.replace('.dmm', '.dmm2'))
-print('Changes to make:')
+logging.info('Changes to make:')
 for action in actions:
-    print(' * ' + str(action))
-print('Iterating tiles...')
+    logging.info(' * ' + str(action))
+logging.info('Iterating tiles...')
 hashMap={} # hash => null to remove, hash => True to not remove, hash => Tile to replace with this.
 it = dmm.Tiles()
 thousandsActivity=0
@@ -135,9 +135,9 @@ for tile in it:
             '''
             if len(changes) > 0:
                 thousandsActivity+=1
-                print(atomInfo if atom is not None else '{} (DELETED)'.format(atomInfo))
+                logging.info(atomInfo if atom is not None else '{} (DELETED)'.format(atomInfo))
                 for change in changes:
-                    print(' * ' + change)
+                    logging.info(' * ' + change)
         if atom is not None:
             tile.AppendAtom(atom)
         if hash not in hashMap:

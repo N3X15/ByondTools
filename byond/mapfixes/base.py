@@ -7,6 +7,8 @@ import logging
 from byond.basetypes import BYONDString, BYONDValue
 # from byond.directions import *
 
+_log = logging.getLogger('byond.mapfixes.base')
+
 # Decorator
 class MapFix(object):
     all = {}
@@ -17,7 +19,7 @@ class MapFix(object):
         if self.id is None:
             fname_p = c.__name__
             self.id = fname_p
-        print('Adding MapFix {0}-{1}.'.format(self.category, self.id))
+        _log.debug('Adding MapFix {0}-{1}.'.format(self.category, self.id))
         if self.category not in MapFix.all:
             MapFix.all[self.category] = {}
         MapFix.all[self.category][self.id] = c
@@ -29,7 +31,7 @@ def DeclareDependencies(dependee, dependencies):
     if dependee not in _dependencies:
         _dependencies[dependee] = []
     _dependencies[dependee] += dependencies
-    print('  Dependencies: {}'.format(dependencies))
+    _log.debug('  Dependencies: {}'.format(dependencies))
     
 def GetDependencies():
     return _dependencies

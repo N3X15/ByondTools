@@ -213,7 +213,7 @@ class Tile(object):
                 continue
             a = self.map.GetInstance(id)
             if a is None:
-                print('WARNING: Unknown instance ID {}!'.format(id))
+                self.log.debug('Unknown instance ID {}!'.format(id))
                 continue
             atoms += [a]
         return atoms

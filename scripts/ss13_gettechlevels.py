@@ -26,7 +26,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 """
-import os, sys, re
+import os, sys, re, logging
 from byond.objtree import ObjectTree
 from byond.basetypes import Atom, Proc
 
@@ -53,7 +53,7 @@ def ProcessTechLevels(atom, path=''):
             for techchunk in techchunks:
                 parts = techchunk.split('=')
                 if len(parts) != 2:
-                    print('Improperly formed origin_tech in {0}: {1}'.format(atom.path, val.value))
+                    logging.warn('Improperly formed origin_tech in {0}: {1}'.format(atom.path, val.value))
                     continue
                 tech = parts[0]
                 level = int(parts[1])
