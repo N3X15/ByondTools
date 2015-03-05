@@ -559,6 +559,7 @@ class ObjectTree:
                         if proc is None: continue
                         self.ignoreStartIndent = numtabs
                         self.loadingProc = proc
+                        self.loadingProc.ClearCode()
                         self.fileLayout += [('PROCDEF', proc.path)]
                         continue
                     
@@ -572,6 +573,7 @@ class ObjectTree:
                         if proc is None: continue
                         self.ignoreStartIndent = numtabs
                         self.loadingProc = proc
+                        self.loadingProc.ClearCode()
                         self.fileLayout += [('PROCDEF', proc.path)]
                         continue
                 

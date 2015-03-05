@@ -448,6 +448,7 @@ class Atom:
         o += self.path + '\n'
         
         # o += '\t//{0} properties total\n'.format(len(self.properties))
+        written=[]
         for name in sorted(self.properties.keys()):
             prop = self.properties[name]
             if prop.inherited: continue
@@ -468,7 +469,12 @@ class Atom:
         # o += '\t//{0} children total\n'.format(len(self.children))
         procs = ''
         children = ''
+        written=[]
         for ck in sorted(self.children.keys()):
+            if ck in written:
+                continue
+            written.append(ck) 
+            #co = '\n// ck='+repr(ck)
             co = '\n'
             co += self.children[ck]._DumpCode()
             if isinstance(self.children[ck], Proc):
@@ -501,7 +507,10 @@ class Proc(Atom):
         return 0
         
     def AddCode(self, indentLevel, line):
-        self.code += [(indentLevel, line)]
+        self.code.append( (indentLevel, line) )
+        
+    def ClearCode(self):
+        self.code = []
         
     def AddBlankLine(self):
         if len(self.code) > 0 and self.code[-1][1] == '':

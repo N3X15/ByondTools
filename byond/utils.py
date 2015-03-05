@@ -1,5 +1,4 @@
 import hashlib, ast, os, time, sys
-#from time import clock
 import operator as op
 
 def clock():
@@ -38,12 +37,11 @@ def getElapsed(start):
 
 def secondsToStr(t):
     return "%d:%02d:%02d.%03d" % \
-        reduce(lambda ll,b : divmod(ll[0],b) + ll[1:],
-            [(t*1000,),1000,60,60])
+        reduce(lambda ll, b : divmod(ll[0], b) + ll[1:], [(t * 1000,), 1000, 60, 60])
         
 class TimeExecution(object):
     def __init__(self, label):
-        self.start_time=None
+        self.start_time = None
         self.label = label
     
     def __enter__(self):
@@ -55,11 +53,11 @@ class TimeExecution(object):
         return False
 
 class ProfilingTarget:
-    def __init__(self,name):
-        self.name=name
-        self.calls=0
-        self.elapsed=0
-        self.start_time=0
+    def __init__(self, name):
+        self.name = name
+        self.calls = 0
+        self.elapsed = 0
+        self.start_time = 0
         
     def start(self):
         start_time = clock()
@@ -71,14 +69,14 @@ class ProfilingTarget:
         return el
     
     def __str__(self):
-        return "{} - C: {}, E: {}, A: {}".format(self.name,self.calls,getElapsed(self.elapsed),getElapsed(self.elapsed/self.calls))
+        return "{} - C: {}, E: {}, A: {}".format(self.name, self.calls, getElapsed(self.elapsed), getElapsed(self.elapsed / self.calls))
     
     def ToCSV(self):
-        return "{},{},{},{}".format(self.name,self.calls,getElapsed(self.elapsed),getElapsed(self.elapsed/self.calls))
+        return "{},{},{},{}".format(self.name, self.calls, getElapsed(self.elapsed), getElapsed(self.elapsed / self.calls))
     
 class Profiler:
     def __init__(self):
-        self.targets={}
+        self.targets = {}
 
 def eval_(node):
     if isinstance(node, ast.Num):  # <number>

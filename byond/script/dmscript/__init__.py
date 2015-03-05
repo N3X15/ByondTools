@@ -35,14 +35,14 @@ class PPStackElement(object):
     
     def gotToken(self, name):
         if name in self.ends:
-            return False # Pop off stack
+            return False  # Pop off stack
         if name in self.toggles:
             self.blocking = not self.blocking
-        return True # continue
+        return True  # continue
     
 class IfDefElement(PPStackElement):
     def __init__(self, state):
-        super(PPStackElement, self).__init__(self,ends=['endif'],toggles=['else'], blocking=state)
+        super(PPStackElement, self).__init__(self, ends=['endif'], toggles=['else'], blocking=state)
     
 class DreamSyntax(object):
     def __init__(self, list_only=False, simplify_lists=False):
@@ -51,7 +51,7 @@ class DreamSyntax(object):
         else:
             self.syntax = self.buildSyntax()
         
-        self.simplify_lists=simplify_lists
+        self.simplify_lists = simplify_lists
         
         #: Preprocessor defines.
         self.macros = {}
@@ -66,7 +66,7 @@ class DreamSyntax(object):
             return self.syntax.parseString(string)
         except pyp.ParseException, err:
             print err.line
-            print "-"*(err.column-1) + "^"
+            print "-"*(err.column - 1) + "^"
             print err
         
     def buildSyntax(self):
@@ -74,9 +74,9 @@ class DreamSyntax(object):
         dreamScript = pyp.Forward()
         
         # Constants
-        singlelineString = pyp.QuotedString('"','\\').setResultsName('string').setParseAction(self.makeString)
-        fileRef = pyp.QuotedString("'",'\\').setResultsName('fileRef').setParseAction(self.makeFileRef)
-        multilineString = pyp.QuotedString(quoteChar='{"',endQuoteChar='"}',multiline=True).setResultsName('string').setParseAction(self.makeString)
+        singlelineString = pyp.QuotedString('"', '\\').setResultsName('string').setParseAction(self.makeString)
+        fileRef = pyp.QuotedString("'", '\\').setResultsName('fileRef').setParseAction(self.makeFileRef)
+        multilineString = pyp.QuotedString(quoteChar='{"', endQuoteChar='"}', multiline=True).setResultsName('string').setParseAction(self.makeString)
         number = pyp.Regex(r'\d+(\.\d*)?([eE]\d+)?').setResultsName('number').setParseAction(self.makeNumber)
         
         # Other symbols
@@ -105,7 +105,6 @@ class DreamSyntax(object):
         dreamList.setParseAction(self.handleList)
         
         #  Paths
-        
         relpath = pyp.ident | relpath + SLASH + pyp.ident
         abspath = SLASH + relpath
         path = (abspath | relpath).setParseAction(self.handlePath)
@@ -128,22 +127,20 @@ class DreamSyntax(object):
         
         # Var Declarations
         ##########################
-        var_modifiers = pyp.ZeroOrMore(SLASH + (VAR_GLOBAL|VAR_CONST)).setResultsName('modifiers')
+        var_modifiers = pyp.ZeroOrMore(SLASH + (VAR_GLOBAL | VAR_CONST)).setResultsName('modifiers')
         var_assignment = EQUAL + constant
         varblock_inner_ref = pyp.ident.setResultsName('name') + pyp.Optional(var_assignment)
-        var_argument = VAR + pyp.Optional(abspath) + SLASH +  pyp.ident.setResultsName('name') + pyp.Optional(var_assignment)
-        varblock_inner_decl = var_modifiers +  pyp.Optional(abspath) + SLASH + varblock_inner_ref
+        var_argument = VAR + pyp.Optional(abspath) + SLASH + pyp.ident.setResultsName('name') + pyp.Optional(var_assignment)
+        varblock_inner_decl = var_modifiers + pyp.Optional(abspath) + SLASH + varblock_inner_ref
         varblock_element = varblock_inner_decl | varblock_inner_ref
         varblock = VAR + pyp.indentedBlock(var_blockinner_decl)
         inline_vardecl = VAR + varblock_inner_decl
         vardecl = varblock | inline_vardecl
         
-        
-        
         # Proc Declarations
         PROC = pyp.Keyword('proc')
         proc_args = '(' + pyp.delimitedList(var_argument | pyp.ident.setResultsName('name')) + ')'
-        procblock_proc=pyp.ident.setResultsName('name') + proc_args + pyp.indentedBlock(proc_instructions)
+        procblock_proc = pyp.ident.setResultsName('name') + proc_args + pyp.indentedBlock(proc_instructions)
         procblock = PROC + pyp.indentedBlock(procblock_proc, [1])
         
         # Atom blocks
@@ -157,9 +154,9 @@ class DreamSyntax(object):
         dreamList = pyp.Forward()
         
         # Literals
-        singlelineString = pyp.QuotedString('"','\\').setResultsName('string').setParseAction(self.makeListString)
-        fileRef = pyp.QuotedString("'",'\\').setResultsName('fileRef').setParseAction(self.makeFileRef)
-        multilineString = pyp.QuotedString(quoteChar='{"',endQuoteChar='"}',multiline=True).setResultsName('string').setParseAction(self.makeListString)
+        singlelineString = pyp.QuotedString('"', '\\').setResultsName('string').setParseAction(self.makeListString)
+        fileRef = pyp.QuotedString("'", '\\').setResultsName('fileRef').setParseAction(self.makeFileRef)
+        multilineString = pyp.QuotedString(quoteChar='{"', endQuoteChar='"}', multiline=True).setResultsName('string').setParseAction(self.makeListString)
         number = pyp.Regex(r'\d+(\.\d*)?([eE]\d+)?').setResultsName('number').setParseAction(self.makeListNumber)
         
         # Other symbols
@@ -177,41 +174,92 @@ class DreamSyntax(object):
         dreamList.setParseAction(self.makeList)
         
         return dreamList
+        
+    def buildMapSyntax(self):
+        '''Subset of grammar for DMM files.
+           
+           "aai" = (/obj/structure/sign/securearea{desc = "A warning sign which reads 'HIGH VOLTAGE'"; icon_state = "shock"; name = "HIGH VOLTAGE"; pixel_y = -32},/turf/space,/area)
+        '''
+        dreamList = pyp.Forward()
+        
+        # Literals
+        singlelineString = pyp.QuotedString('"', '\\').setResultsName('string').setParseAction(self.makeListString)
+        fileRef = pyp.QuotedString("'", '\\').setResultsName('fileRef').setParseAction(self.makeFileRef)
+        multilineString = pyp.QuotedString(quoteChar='{"', endQuoteChar='"}', multiline=True).setResultsName('string').setParseAction(self.makeListString)
+        number = pyp.Regex(r'\-?\d+(\.\d*)?([eE]\d+)?').setResultsName('number').setParseAction(self.makeListNumber)
+        
+        #  Paths
+        relpath = pyp.ident | relpath + SLASH + pyp.ident
+        abspath = SLASH + relpath
+        path = (abspath | relpath).setParseAction(self.handlePath)
+        pathslash = path + SLASH
+        
+        # Other symbols
+        listStart = pyp.Suppress('list(')
+        openParen = pyp.Suppress("(")
+        closeParen = pyp.Suppress(')')
+        
+        # Grammar
+        listConstant = singlelineString | fileRef | multilineString | number | dreamList | abspath
+        listElement = listConstant | (listConstant + '=' + listConstant)
+        listElement = pyp.operatorPrecedence(listElement, [
+                                ("=", 2, pyp.opAssoc.LEFT,),
+                                ])
+        listContents = pyp.delimitedList(listElement)
+        dreamList << pyp.Group(listStart + listContents + closeParen)
+        dreamList.setParseAction(self.makeList)
+        
+        
+        # DMM Atom definition
+        atomDefProperty = pyp.ident + "=" + listConstant 
+        atomDefProperty = pyp.operatorPrecedence(atomDefProperty, [
+                                ("=", 2, pyp.opAssoc.LEFT,),
+                                ])
+        atomDefPropertyListContents = pyp.delimitedList(listElement, delim=';')
+        atomDefProperties = pyp.Suppress("{") + atomDefPropertyListContents + pyp.Suppress("}")
+        atomDef = abspath | abspath + atomDefProperties
+        
+        # DMM Tile Definition
+        tileDefListContents = pyp.delimitedList(atomDef)
+        tileDefAtomList = openParen + tileDefListContents + closeParen
+        tileDef = singlelineString + '=' + tileDefAtomList
+        tileDef.setParseAction(self.makeTileDef)
+        return tileDef
 
-    def makeListString(self,s,l,t):
+    def makeListString(self, s, l, t):
         return self.makeString(s, l, t, True)
     def makeString(self, s, l, toks, from_list=False):
-        #print('makeString(%r)' % toks[0])
+        # print('makeString(%r)' % toks[0])
         if self.simplify_lists:
             return [toks[0]]
         return [BYONDString(toks[0])]
     
-    def makeFileRef(self, s,l,toks):
-        #print('makeFileRef(%r)' % toks[0])
+    def makeFileRef(self, s, l, toks):
+        # print('makeFileRef(%r)' % toks[0])
         return [BYONDFileRef(toks[0])]
     
-    def makeListNumber(self,s,l,t):
+    def makeListNumber(self, s, l, t):
         return self.makeString(s, l, t, True)
     
-    def makeNumber(self, s,l,toks, from_list=False):
-        #print('makeNumber(%r)' % toks[0])
+    def makeNumber(self, s, l, toks, from_list=False):
+        # print('makeNumber(%r)' % toks[0])
         return [BYONDValue(float(toks[0]))]
 
     def makeList(self, toks):
-        #print('makeList')
-        #for i in range(len(toks)):
+        # print('makeList')
+        # for i in range(len(toks)):
         #   print('{} = {}'.format(i,toks[i]))
         toks = toks[0]
         print('makeList(%r)' % toks)
-        if len(toks[0]) == 1: # Constant, so a non-assoc list.
-            l=[]
+        if len(toks[0]) == 1:  # Constant, so a non-assoc list.
+            l = []
             for tok in toks:
                 l.append(tok[0][1])
             return l
-        else: # Associative
-            l={}
-            for k,_,v in toks:
-                l[k]=v
+        else:  # Associative
+            l = {}
+            for k, _, v in toks:
+                l[k] = v
             return l
         
 def ParseDreamList(string):

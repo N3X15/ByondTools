@@ -147,7 +147,7 @@ for tile in it:
                 hashMap[hash]=atom
     if (it.pos % 1000) == 0:
         if thousandsActivity == 0:
-            print(it.pos)
+            logging.info(it.pos)
         thousandsActivity=0
 #for atom, _ in atomsToFix.items():
 #    print('Atom {0} needs id_tag.'.format(atom))
