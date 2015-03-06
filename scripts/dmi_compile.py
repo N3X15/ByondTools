@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 '''
-Run within icons/mob/in-hand.
+Run next to a dmi_config.yml file.
 
 Usage:
-    $ cd icons/mob/in-hands
-    $ python ss13_makeinhands.py
+    $ python dmi_compile.py
 
-ss13_makeinhands.py - Generates a large DMI from several smaller DMIs.
-    Specifically used for making icons/mob/items_(left|right)hand.dmi
+dmi_compile.py - Generates a large DMI from several smaller DMIs.
+
+Specifically used for making icons/mob/items_(left|right)hand.dmi in SS13.
 
 Copyright 2013 Rob "N3X15" Nelson <nexis@7chan.org>
 
@@ -29,30 +29,27 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 '''
-import os, sys, logging
-
-ToBuild = {
-#   ' file to build':         'directory to pull from/',
-    '../items_lefthand.dmi':  'left/',
-    '../items_righthand.dmi': 'right/'
-}
-
-# Tell Python where to find BYONDTools.
-# Assuming we're in icons/mob/in-hand
-sys.path.append('../../../tools/BYONDTools')  # For byond
-sys.path.append('../../../tools/BYONDTools/scripts')  # For dmi
+import os, sys, logging, yaml
 
 from byond.DMI import DMI
-from dmi import compare_all
+from byond.DMI.utils import compare_all
 
-def buildDMI(directory, output):
+def fail(msg):
+    logging.critical(msg)
+    sys.exit(1)
+    
+def requireOption(directive, option, config):
+    if option not in config:
+        fail('"{0}" directive doesn\'t have "{1}" option in its configuration. Check your dmi_config.yml.'.format(directive,option))
+    
+def buildDMIFromDir(directory, output):
     dmi = DMI(output)
     logging.info('Creating {0}...'.format(output))
     for root, _, files in os.walk(directory):
         for filename in files:
             if filename.endswith('.dmi') and not filename.endswith('.new.dmi'):
                 filepath = os.path.join(root, filename)
-                logging.info('Adding {0}...'.format(filename, output))
+                #logging.info('Adding {0}...'.format(filename, output))
                 subdmi = DMI(filepath)
                 subdmi.loadAll()
                 if subdmi.icon_height != 32 or subdmi.icon_width != 32:
@@ -64,10 +61,21 @@ def buildDMI(directory, output):
                         continue
                     dmi.states[state_name] = subdmi.states[state_name]
                     changes += 1
-                logging.info('Added {0} states.'.format(changes))
+                #logging.info('Added {0} states.'.format(changes))
     # save
     logging.info('Saving {0} states to {1}...'.format(len(dmi.states), output))
     dmi.save(output)
+    
+def handleBuildDMI(config):
+    requireOption('buildDMI', 'dir', config)
+    requireOption('buildDMI', 'output', config)
+    buildDMIFromDir(config['dir'], config['output'])
+    
+def handleCompare(config):
+    requireOption("compare", 'left', config)
+    requireOption("compare", 'right', config)
+    requireOption("compare", 'report', config)
+    compare_all(config['left'], config['right'], config['report'], None, newfile_theirs=False, newfile_mine=False, check_changed=False)
     
 if __name__ == '__main__':
     logging.basicConfig(
@@ -76,8 +84,20 @@ if __name__ == '__main__':
         level=logging.INFO  # ,
         # filename='logs/main.log',
         # filemode='w'
-        )
-    # Cheating, but useful for checking for unsync'd stuff
-    compare_all('left/', 'right/', 'in-hand_sync_report.txt', None, newfile_theirs=False, newfile_mine=False, check_changed=False)
-    for output, input_dir in ToBuild.items():
-        buildDMI(input_dir, output)
+    )
+    
+    directives={
+        'buildDMI':handleBuildDMI,
+        'compare':handleCompare
+    }
+    
+    yml = []
+    with open('dmi_config.yml','r') as f:
+        yml = yaml.load(f)
+    print(repr(yml))
+    for listItem in yml:
+        for directive,config in listItem.items():
+            if directive not in directives:
+                fail('Unknown directive '+directive)
+            instruction = directives[directive]
+            instruction(config)

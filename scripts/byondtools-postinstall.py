@@ -24,13 +24,10 @@ else:
 scripts = [
     'dmm',
     'dmi',
+	'dmi_compile',
     'dmindent',
     'dmmrender',
     'dmmfix',
-    
-    #TODO: Combine into dmi.
-    'ss13_makeinhands',
-    
     'ss13_gettechlevels',
     
     # Our post-install.  Now run on Linux, as well.
