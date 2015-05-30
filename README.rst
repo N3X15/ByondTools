@@ -22,7 +22,7 @@ Requirements
 Use
 ---
 
-Initial documentation is taking shape at ss13.pomf.se/wiki/index.php/User:N3X15/Guide_to_BYONDTools
+Initial documentation is taking shape at http://ss13.pomf.se/wiki/index.php/User:N3X15/Guide_to_BYONDTools
 
 API Status
 ----------
