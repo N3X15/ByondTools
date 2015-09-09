@@ -135,6 +135,8 @@ class ChangeType(Matcher):
         return False
     
     def Fix(self, atom):
+        if self.new == '':
+            return None
         atom.path = self.new
         return atom
     

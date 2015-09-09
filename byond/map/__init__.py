@@ -121,7 +121,7 @@ class AtomIterator:
     def next(self):
         self.pos += 1
             
-        if self.pos >= len(self.max):
+        if self.pos >= self.max:
             raise StopIteration
         
         t = self.map.instances[self.pos]
@@ -580,6 +580,21 @@ class Map:
         if a.coords is not None:
             self.instances[a.ID].addLocation(a.coords)
         return a.ID
+        
+    def RemoveAtom(self, a):
+        '''
+        Remove atom from the entire map.
+        
+        :param a Atom: Tile to update.
+        '''
+        thash = a.GetHash()
+        
+        if a.ID and len(self.instances) < a.ID and self.instances[a.ID] is not None:
+            self.instances[a.ID].rmLocation(self, a.coords)
+            del self.instances[a.ID]
+            
+        if thash in self._instance_idmap:
+            del self._instance_idmap[thash]
         
     def CreateZLevel(self, height, width, z= -1):
         zLevel = MapLayer(z if z >= 0 else len(self.zLevels), self, height, width)

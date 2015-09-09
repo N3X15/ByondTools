@@ -4,6 +4,32 @@ from byond.basetypes import BYONDString, BYONDValue, Atom, PropertyFlags
 from byond.directions import *
 
 @MapFix('ss13')
+class RemoveOpenSS13Vars(Matcher):
+    VARS_TO_REMOVE=('r_access','access_level','engine_access','lab_access','air_access','poison','allowed','freq','o2tanks','pltanks','poison','r_air','r_engine','r_lab','registered')
+    def __init__(self):
+        self.removed=[]
+        
+    def Matches(self, atom):
+        for key in atom.mapSpecified:
+            if key in self.VARS_TO_REMOVE:
+                return True
+        return False
+    
+    def Fix(self, atom):
+        self.removed=[]
+        for key in atom.mapSpecified:
+            if key in self.VARS_TO_REMOVE:
+                atom.mapSpecified.remove(key)
+                del atom.properties[key]
+                self.removed.append(key)
+        return atom
+    
+    def __str__(self):
+        if len(self.removed) == 0:
+            return 'Remove Old OpenSS13 variables'
+        return 'Removed old OpenSS13 variables: ' + ', '.join(self.removed)
+
+@MapFix('ss13')
 class StandardizeAPCs(Matcher):
     ACT_CLEAR_NAME = 1
     ACT_FIX_OFFSET = 2
